@@ -13,6 +13,16 @@ export interface CreateCourseDto {
     content: string;
 }
 
+export interface UpdateScriptDto {
+    scenes: Scene[];
+}
+
+export enum ScriptStatus {
+    DRAFT = 'DRAFT',
+    PUBLISHED = 'PUBLISHED',
+    ARCHIVED = 'ARCHIVED',
+}
+
 export interface Course {
     id: string;
     topic: string;
@@ -25,6 +35,8 @@ export interface Script {
     id: string;
     courseId: string;
     scenes: Scene[];
+    status: ScriptStatus;
+    originalScenes: Scene[];
     createdAt: Date;
     updatedAt: Date;
 }

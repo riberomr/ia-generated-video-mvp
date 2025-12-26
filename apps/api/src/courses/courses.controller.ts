@@ -1,6 +1,6 @@
-import { Body, Controller, Post, Get } from '@nestjs/common';
+import { Body, Controller, Post, Get, Patch, Param } from '@nestjs/common';
 import { CoursesService } from './courses.service';
-import { CreateCourseDto } from '@eduvideogen/shared-types';
+import { CreateCourseDto, UpdateScriptDto } from '@eduvideogen/shared-types';
 import { Prisma } from '@eduvideogen/database';
 
 @Controller('courses')
@@ -10,6 +10,16 @@ export class CoursesController {
     @Post('generate-script')
     async generateScript(@Body() dto: CreateCourseDto) {
         return this.coursesService.generateScript(dto);
+    }
+
+    @Get('scripts/:id')
+    async getScript(@Param('id') id: string) {
+        return this.coursesService.getScript(id);
+    }
+
+    @Patch('scripts/:id')
+    async updateScript(@Param('id') id: string, @Body() dto: UpdateScriptDto) {
+        return this.coursesService.updateScript(id, dto);
     }
 
     @Get()

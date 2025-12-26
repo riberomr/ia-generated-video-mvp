@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CreateCourseDto } from '@eduvideogen/shared-types';
+import { CreateCourseDto, UpdateScriptDto } from '@eduvideogen/shared-types';
 import { GroqService } from './groq.service';
 import { VideoGenerationService } from './video-generation.service';
 import { PrismaService } from '../database/prisma.service';
@@ -30,7 +30,9 @@ export class CoursesService {
         const script = await this.prisma.script.create({
             data: {
                 courseId: course.id,
-                scenes: scenes as unknown as Prisma.JsonArray, // Casting for Prisma Json type
+                scenes: scenes as unknown as Prisma.JsonArray,
+                originalScenes: scenes as unknown as Prisma.JsonArray,
+                status: 'DRAFT',
             }
         });
 
@@ -40,6 +42,24 @@ export class CoursesService {
             courseTopic: course.topic,
             generatedScript: scenes,
         };
+    }
+
+    async updateScript(id: string, dto: UpdateScriptDto) {
+        const script = await this.prisma.script.update({
+            where: { id },
+            data: {
+                scenes: dto.scenes as unknown as Prisma.JsonArray,
+                status: 'PUBLISHED',
+            },
+        });
+        return script;
+    }
+
+    async getScript(id: string) {
+        return this.prisma.script.findUnique({
+            where: { id },
+            include: { course: true }
+        });
     }
 
     async findAll(): Promise<Prisma.CourseGetPayload<{

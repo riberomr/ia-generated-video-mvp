@@ -15,6 +15,11 @@ export class VideosController {
         return this.heyGenService.getVoices();
     }
 
+    @Get('voices/locales')
+    async getVoicesLocales() {
+        return this.heyGenService.getVoicesLocales();
+    }
+
     @Post('generate/:scriptId')
     async generateVideo(
         @Param('scriptId') scriptId: string,

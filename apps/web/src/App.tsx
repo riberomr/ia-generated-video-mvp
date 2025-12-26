@@ -1,39 +1,48 @@
-import { BrowserRouter } from 'react-router-dom';
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { ScriptGenerator } from './components/ScriptGenerator';
 import { SavedScripts } from './components/SavedScripts';
+import { ScriptEditor } from './components/ScriptEditor';
+
+function NavBar() {
+    const location = useLocation();
+
+    const isActive = (path: string) => {
+        return location.pathname === path
+            ? 'border-blue-600 text-blue-600'
+            : 'border-transparent text-gray-500 hover:text-gray-700';
+    };
+
+    return (
+        <nav className="bg-white shadow-sm border-b">
+            <div className="max-w-4xl mx-auto px-6 h-16 flex items-center space-x-8">
+                <Link
+                    to="/"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/')}`}
+                >
+                    Generate Script
+                </Link>
+                <Link
+                    to="/saved"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/saved')}`}
+                >
+                    Saved Scripts
+                </Link>
+            </div>
+        </nav>
+    );
+}
 
 function App() {
-    const [activeTab, setActiveTab] = useState<'generate' | 'saved'>('generate');
-
     return (
         <BrowserRouter>
             <div className="min-h-screen bg-gray-100">
-                <nav className="bg-white shadow-sm border-b">
-                    <div className="max-w-4xl mx-auto px-6 h-16 flex items-center space-x-8">
-                        <button
-                            onClick={() => setActiveTab('generate')}
-                            className={`h-full border-b-2 px-2 font-medium ${activeTab === 'generate'
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            Generate Script
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('saved')}
-                            className={`h-full border-b-2 px-2 font-medium ${activeTab === 'saved'
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            Saved Scripts
-                        </button>
-                    </div>
-                </nav>
-
+                <NavBar />
                 <main className="py-6">
-                    {activeTab === 'generate' ? <ScriptGenerator /> : <SavedScripts />}
+                    <Routes>
+                        <Route path="/" element={<ScriptGenerator />} />
+                        <Route path="/saved" element={<SavedScripts />} />
+                        <Route path="/editor/:id" element={<ScriptEditor />} />
+                    </Routes>
                 </main>
             </div>
         </BrowserRouter>

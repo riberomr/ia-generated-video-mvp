@@ -51,6 +51,12 @@ export class HeyGenService {
         return response.data?.voices || [];
     }
 
+    async getVoicesLocales() {
+        const response = await this.fetchFromHeyGen('/v2/voices/locales');
+        return response.data?.locales || [];
+    }
+
+
     async generateVideo(scriptId: string, options: { avatarId?: string; voiceId?: string } = {}) {
         // 1. Retrieve Script
         // @ts-ignore
@@ -100,6 +106,7 @@ export class HeyGenService {
                 avatar_style: 'normal',
             },
             voice: {
+                // locale: 'es-AR', // TODO: Add locale support
                 type: 'text',
                 voice_id: voiceId,
                 input_text: scene.text, // Moved inside voice object

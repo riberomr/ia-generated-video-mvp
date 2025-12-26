@@ -8,6 +8,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ScriptStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model Course {
   id        String   @id @default(uuid())
   topic     String
@@ -22,6 +28,8 @@ model Script {
   courseId  String
   course    Course   @relation(fields: [courseId], references: [id])
   scenes    Json     // Array of Scenes (Renamed from script for clarity vs Model name, or keep script? Let's use scenes)
+  status    ScriptStatus @default(DRAFT)
+  originalScenes Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   videos    RenderedVideo[]

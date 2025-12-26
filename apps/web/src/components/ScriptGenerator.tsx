@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { CreateCourseDto, Scene } from '@eduvideogen/shared-types';
+import { CreateCourseDto } from '@eduvideogen/shared-types';
+import { useNavigate } from 'react-router-dom';
 
 export function ScriptGenerator() {
     const { register, handleSubmit, formState: { isSubmitting } } = useForm<CreateCourseDto>();
-    const [generatedScript, setGeneratedScript] = useState<Scene[] | null>(null);
-    const [jobId, setJobId] = useState<string | null>(null);
+    const navigate = useNavigate();
 
     const onSubmit = async (data: CreateCourseDto) => {
         try {
@@ -22,8 +21,7 @@ export function ScriptGenerator() {
             }
 
             const result = await response.json();
-            setGeneratedScript(result.generatedScript);
-            setJobId(result.videoJobId);
+            navigate(`/editor/${result.scriptId}`);
         } catch (error) {
             console.error(error);
             alert('Error generating script');
@@ -61,32 +59,6 @@ export function ScriptGenerator() {
                     {isSubmitting ? 'Generating...' : 'Generate Script'}
                 </button>
             </form>
-
-            {generatedScript && (
-                <div className="bg-gray-50 p-6 rounded-lg border">
-                    <h2 className="text-2xl font-semibold mb-4">Generated Script Preview</h2>
-                    {jobId && <div className="mb-4 text-green-600 text-sm">Job ID: {jobId}</div>}
-
-                    <div className="space-y-6">
-                        {generatedScript.map((scene, index) => (
-                            <div key={index} className="bg-white p-4 rounded shadow-sm border border-gray-200">
-                                <div className="flex justify-between mb-2">
-                                    <span className="font-bold text-gray-700">Scene {index + 1}</span>
-                                    <span className="text-gray-500 text-sm">{scene.estimated_duration}s</span>
-                                </div>
-                                <div className="mb-2">
-                                    <span className="font-semibold text-blue-600">Visual: </span>
-                                    <span className="text-gray-800">{scene.visual_description}</span>
-                                </div>
-                                <div>
-                                    <span className="font-semibold text-green-600">Audio: </span>
-                                    <p className="text-gray-800 italic mt-1">{scene.text}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
