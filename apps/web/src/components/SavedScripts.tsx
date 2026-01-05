@@ -150,7 +150,7 @@ export const SavedScripts: React.FC = () => {
 
                                                                 {video.status === 'COMPLETED' && video.downloadUrl && (
                                                                     <a
-                                                                        href={video.downloadUrl}
+                                                                        href={`http://localhost:3000/videos/${video.id}/redirect`}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="text-green-600 hover:text-green-800 underline font-medium"
