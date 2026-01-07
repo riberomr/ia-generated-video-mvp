@@ -82,8 +82,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
         setError(null);
         try {
             const [avatarRes, voiceRes] = await Promise.all([
-                fetch(`http://localhost:3000/videos/avatars?provider=${provider}`),
-                fetch(`http://localhost:3000/videos/voices?provider=${provider}`)
+                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/avatars?provider=${provider}`),
+                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/voices?provider=${provider}`)
             ]);
 
             if (!avatarRes.ok) throw new Error('Failed to fetch avatars');
@@ -115,8 +115,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
         setError(null);
         try {
             const [templatesRes, assetsRes] = await Promise.all([
-                fetch(`http://localhost:3000/videos/synthesia/templates`),
-                fetch(`http://localhost:3000/videos/synthesia/assets`)
+                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/synthesia/templates`),
+                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/synthesia/assets`)
             ]);
 
             if (!templatesRes.ok) throw new Error('Failed to fetch templates');
@@ -136,7 +136,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
     const fetchTemplateDetails = async (id: string) => {
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:3000/videos/synthesia/templates/${id}`);
+            const res = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/synthesia/templates/${id}`);
             if (!res.ok) throw new Error('Failed to fetch template details');
             const data = await res.json();
             setTemplateDetails(data);

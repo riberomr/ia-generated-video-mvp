@@ -26,7 +26,7 @@ export function SmartScriptingPage() {
                 sourceText
             };
 
-            const response = await fetch(`http://localhost:3000/scripts/analyze-and-map`, {
+            const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/scripts/analyze-and-map`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dto)
@@ -67,7 +67,7 @@ export function SmartScriptingPage() {
                 content: sourceText || "Smart Script Content"
             };
 
-            const courseRes = await fetch('http://localhost:3000/courses', {
+            const courseRes = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/courses`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(courseDto)
@@ -86,7 +86,7 @@ export function SmartScriptingPage() {
                 scenes: scenes // Extracted from template_data keys
             };
 
-            const response = await fetch('http://localhost:3000/scripts', {
+            const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/scripts`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dto)

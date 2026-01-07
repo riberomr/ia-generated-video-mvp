@@ -26,7 +26,7 @@ export const SavedScripts: React.FC = () => {
 
     const fetchCourses = async () => {
         try {
-            const response = await fetch('http://localhost:3000/courses');
+            const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/courses`);
             const data = await response.json();
             setCourses(data);
             setLoading(false);
@@ -46,7 +46,7 @@ export const SavedScripts: React.FC = () => {
 
         setGenerating(selectedScript.id);
         try {
-            const response = await fetch(`http://localhost:3000/videos/generate/${selectedScript.id}`, {
+            const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/generate/${selectedScript.id}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ export const SavedScripts: React.FC = () => {
 
     const handleCheckStatus = async (videoId: string) => {
         try {
-            await fetch(`http://localhost:3000/videos/status/${videoId}`);
+            await fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/status/${videoId}`);
             fetchCourses();
         } catch (error) {
             console.error('Error checking status:', error);
@@ -147,7 +147,7 @@ export const SavedScripts: React.FC = () => {
 
                                                                 {video.status === 'COMPLETED' && video.downloadUrl && (
                                                                     <a
-                                                                        href={`http://localhost:3000/videos/${video.id}/redirect`}
+                                                                        href={`${import.meta.env.VITE_APP_BASE_URL}/videos/${video.id}/redirect`}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         className="text-green-600 hover:text-green-800 underline font-medium"

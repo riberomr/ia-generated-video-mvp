@@ -37,7 +37,7 @@ export function ScriptEditor() {
 
         const fetchScript = async () => {
             try {
-                const response = await fetch(`http://localhost:3000/courses/scripts/${id}`);
+                const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/courses/scripts/${id}`);
                 if (!response.ok) throw new Error('Failed to load script');
                 const data: Script = await response.json();
                 setScript(data);
@@ -109,7 +109,7 @@ export function ScriptEditor() {
     }
 
     const saveScript = async (dto: any) => {
-        const response = await fetch(`http://localhost:3000/courses/scripts/${id}`, {
+        const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/courses/scripts/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dto)

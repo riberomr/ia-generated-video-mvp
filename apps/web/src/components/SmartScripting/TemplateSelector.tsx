@@ -14,7 +14,7 @@ export function TemplateSelector({ onSelect }: Props) {
         const fetchTemplates = async () => {
             try {
                 // Using hardcoded URL as seen in other components, ideally use env var
-                const res = await fetch('http://localhost:3000/videos/synthesia/templates?source=workspace',);
+                const res = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/synthesia/templates?source=workspace`,);
                 if (!res.ok) throw new Error('Failed to fetch templates');
                 const data = await res.json();
                 setTemplates(data || []);

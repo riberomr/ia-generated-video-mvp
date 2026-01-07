@@ -8,7 +8,7 @@ export function ScriptGenerator() {
 
     const onSubmit = async (data: CreateCourseDto) => {
         try {
-            const response = await fetch('http://localhost:3000/courses/generate-script', {
+            const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/courses/generate-script`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
