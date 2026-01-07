@@ -16,8 +16,9 @@ This project is built as a **Turborepo** monorepo with the following structure:
 -   **Frontend**: React 19, Vite, TailwindCSS (Styled Components style), Lucide React.
 -   **Backend**: NestJS, PostgreSQL, Prisma ORM.
 -   **AI**:
-    -   **Groq (Llama 3.3)**: For script generation.
-    -   **HeyGen (API v2)**: For video generation (Text-to-Video with Avatars).
+    -   **Groq (Llama 3.3)**: For script generation and **Smart Scripting** (Template Analysis).
+    -   **Synthesia (API v2)**: Primary provider for "Smart Video" generation (Templates, custom Avatars/Voices).
+    -   **HeyGen (API v2)**: Alternative provider for basic text-to-video.
 -   **Infrastructure**: Docker (PostgreSQL, Redis).
 -   **Package Manager**: NPM (with Workspaces).
 
@@ -31,11 +32,12 @@ This project is built as a **Turborepo** monorepo with the following structure:
 -   **Docker**: Required for the database.
 -   **API Keys**:
     -   [Groq API Key](https://console.groq.com/keys)
+    -   [Synthesia API Key](https://www.synthesia.io/api)
     -   [HeyGen API Key](https://app.heygen.com/settings/api)
 
 ### 1. Environment Setup
 
-Create a `.env` file in the root directory (copy from default or use the logic below):
+Create a `.env` file in the root directory:
 
 ```bash
 # PostgreSQL
@@ -47,6 +49,11 @@ DATABASE_URL="postgresql://user:password@localhost:5432/eduvideogen?schema=publi
 # AI Services
 GROQ_API_KEY=your_groq_api_key_here
 HEYGEN_API_KEY=your_heygen_api_key_here
+SYNTHESIA_API_KEY=your_synthesia_api_key_here
+
+# Frontend Configuration
+# Points to your API URL (default: http://localhost:3000)
+VITE_APP_BASE_URL=http://localhost:3000
 ```
 
 ### 2. Install Dependencies
@@ -71,6 +78,13 @@ Push the Prisma schema to the database:
 npx prisma db push
 ```
 
+**Seed Synthesia Assets (Crucial for Smart Scripting):**
+This script populates the database with available Synthesia Avatars and Voices from the `.md` source files.
+
+```bash
+npx tsx packages/database/prisma/seed_synthesia_from_md.ts
+```
+
 ### 5. Run Development Server
 
 This will start both the Frontend (`port 5173`) and Backend (`port 3000`):
@@ -85,37 +99,38 @@ npm run dev
 
 ### 🖥️ Frontend (`apps/web`)
 A modern React application built with Vite.
--   **Script Generator**: Interface to input educational topics.
--   **Saved Scripts**: Manage and view generated scripts.
--   **Video Modal**: Integrated modal to select HeyGen Avatars and Voices for video generation.
+-   **Smart Scripting (Home)**: The core workflow. Select a Synthesia Template -> Input Topic -> AI Auto-maps content to the template's logic.
+-   **Script Editor**: Advanced editor to tweak visual variables and voice scripts before generation.
+-   **Saved Scripts**: Dashboard to view, edit, and generate videos from saved scripts.
 
 ### ⚙️ Backend (`apps/api`)
 A NestJS application providing RESTful endpoints.
--   **/courses**: Handles script generation using Groq.
--   **/videos**: Handles video generation using HeyGen.
-    -   FETch Avatars/Voices directly from HeyGen API.
-    -   Manages video status polling.
+-   **/videos/synthesia**: Handles template fetching, asset listing, and "Smart Video" generation.
+-   **/courses**: Orchestrates the "Smart Scripting" flow, using Groq to map topics to Synthesia template structures.
+-   **/videos**: Handles video generation (Synthesia & HeyGen).
 
 ### 🗄️ Database (`packages/database`)
 Shared library containing the Prisma schema.
--   Currently tracks `Courses`, `Scripts` (Scenes), and `Videos`.
+-   **Key Models**: `Course`, `Script`, `SynthesiaAvatar`, `SynthesiaVoice`.
+-   **Smart Support**: Stores structured `templateData` for perfect template alignment.
 
 ---
 
 ## 🤖 AI Integration Details
 
-### Groq (Scripting)
--   **Service**: `GroqService`
--   **Model**: `llama-3.3-70b-versatile`
--   **Process**: Converts user-provided topics into structured educational scripts with scenes, visual descriptions, and narrator text.
+### Smart Scripting (Groq)
+-   **Logic**: The system analyzes the structure of a selected **Synthesia Template** (counting scenes, identifying visual placeholders).
+-   **Generation**: Uses **Llama-3.3-70b** on Groq to generate a script that fits *perfectly* into that structure (e.g., generating exactly 3 generic bullet points if the template demands `slide_text_1`, `slide_text_2`, `slide_text_3`).
 
-### HeyGen (Video)
--   **Service**: `HeyGenService`
--   **API**: HeyGen v2
+### Synthesia (Primary Video Provider)
+-   **API**: Synthesia v2.
 -   **Features**:
-    -   Dynamic Avatar & Voice fetching.
-    -   Video Generation (currently limited to **1 scene** for credit optimization).
-    -   Real-time status tracking (Pending -> Processing -> Completed).
+    -   **Templates**: Rich video layouts with dynamic background/text replacement.
+    -   **Assets**: Supports replacing template placeholders with images/text.
+    -   **Status**: Real-time webhook-style polling.
+
+### HeyGen (Secondary)
+-   **Use Case**: Basic single-avatar videos without complex template layouts.
 
 ---
 

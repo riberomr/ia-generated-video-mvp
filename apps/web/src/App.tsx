@@ -23,8 +23,8 @@ function NavBar() {
                     Generate Script
                 </Link> */}
                 <Link
-                    to="/smart-scripting"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/smart-scripting')}`}
+                    to="/"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/')}`}
                 >
                     Template based Scripting
                 </Link>

@@ -4,14 +4,15 @@
     "main": "index.ts",
     "types": "index.ts",
     "scripts": {
-        "db:push": "prisma db push",
-        "db:studio": "prisma studio",
-        "generate": "prisma generate"
+        "db:push": "dotenv -e ../../.env -- prisma db push",
+        "db:studio": "dotenv -e ../../.env -- prisma studio",
+        "generate": "dotenv -e ../../.env -- prisma generate"
     },
     "dependencies": {
         "@prisma/client": "^5.22.0"
     },
     "devDependencies": {
+        "dotenv-cli": "^11.0.0",
         "prisma": "^5.0.0",
         "typescript": "^5.0.0"
     }
