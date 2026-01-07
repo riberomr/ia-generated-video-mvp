@@ -27,9 +27,12 @@ model Script {
   id        String   @id @default(uuid())
   courseId  String
   course    Course   @relation(fields: [courseId], references: [id])
-  scenes    Json     // Array of Scenes (Renamed from script for clarity vs Model name, or keep script? Let's use scenes)
+  scenes    Json
   status    ScriptStatus @default(DRAFT)
   originalScenes Json
+  isTemplated Boolean @default(false)
+  templateId String?
+  templateData Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   videos    RenderedVideo[]
@@ -42,6 +45,28 @@ model RenderedVideo {
   status      String   // 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'
   externalId  String?  // HeyGen ID
   downloadUrl String?
+  provider    String   @default("HEYGEN") // 'HEYGEN' or 'SYNTHESIA'
+  requestPayload Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model SynthesiaAvatar {
+  id        String   @id // provider ID (e.g. "49dc8f46...")
+  name      String
+  gender    String
+  version   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SynthesiaVoice {
+  id           String   @id // provider ID
+  name         String   // e.g. "Natural", "Original"
+  gender       String
+  language     String   // e.g. "English (US)"
+  languageCode String   // e.g. "en-US"
+  nativeName   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

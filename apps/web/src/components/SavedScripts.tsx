@@ -18,7 +18,7 @@ export const SavedScripts: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState<string | null>(null);
     const [modalOpen, setModalOpen] = useState(false);
-    const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
+    const [selectedScript, setSelectedScript] = useState<Script | null>(null);
 
     useEffect(() => {
         fetchCourses();
@@ -36,25 +36,22 @@ export const SavedScripts: React.FC = () => {
         }
     };
 
-    const openGenerateModal = (scriptId: string) => {
-        setSelectedScriptId(scriptId);
+    const openGenerateModal = (script: Script) => {
+        setSelectedScript(script);
         setModalOpen(true);
     };
 
-    const handleGenerateVideo = async (avatarId: string, voiceId: string) => {
-        if (!selectedScriptId) return;
+    const handleGenerateVideo = async (payload: any) => {
+        if (!selectedScript) return;
 
-        setGenerating(selectedScriptId);
+        setGenerating(selectedScript.id);
         try {
-            const response = await fetch(`http://localhost:3000/videos/generate/${selectedScriptId}`, {
+            const response = await fetch(`http://localhost:3000/videos/generate/${selectedScript.id}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    avatarId,
-                    voiceId
-                })
+                body: JSON.stringify(payload)
             });
             if (!response.ok) {
                 console.error('Failed to start generation');
@@ -103,7 +100,7 @@ export const SavedScripts: React.FC = () => {
                                             {(script.scenes as unknown as Scene[]).map((scene, idx) => (
                                                 <div key={idx} className="flex gap-2">
                                                     <span className="font-bold text-gray-400">#{idx + 1}</span>
-                                                    <p>{scene.text.substring(0, 100)}...</p>
+                                                    <p>{typeof scene === 'string' ? scene : scene.text.substring(0, 100)}...</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -116,7 +113,7 @@ export const SavedScripts: React.FC = () => {
                                                 Edit
                                             </button>
                                             <button
-                                                onClick={() => openGenerateModal(script.id)}
+                                                onClick={() => openGenerateModal(script)}
                                                 disabled={generating === script.id}
                                                 className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                                             >
@@ -176,6 +173,7 @@ export const SavedScripts: React.FC = () => {
                     isOpen={modalOpen}
                     onClose={() => setModalOpen(false)}
                     onGenerate={handleGenerateVideo}
+                    script={selectedScript}
                 />
             </div>
         </div>

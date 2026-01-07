@@ -1,10 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { VideosModule } from './videos/videos.module';
-import { CoursesController } from './courses/courses.controller';
-import { CoursesService } from './courses/courses.service';
-import { GroqService } from './courses/groq.service';
-import { VideoGenerationService } from './courses/video-generation.service';
+import { CoursesModule } from './courses/courses.module';
+import { ScriptsModule } from './scripts/scripts.module';
 import { PrismaService } from './database/prisma.service';
 
 @Module({
@@ -13,9 +11,11 @@ import { PrismaService } from './database/prisma.service';
             isGlobal: true,
             envFilePath: ['.env', '../../.env'], // Look in api root and monorepo root
         }),
-        VideosModule
+        VideosModule,
+        CoursesModule,
+        ScriptsModule,
     ],
-    controllers: [CoursesController],
-    providers: [CoursesService, GroqService, VideoGenerationService, PrismaService],
+    controllers: [],
+    providers: [PrismaService],
 })
 export class AppModule { }

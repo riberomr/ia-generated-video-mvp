@@ -7,6 +7,11 @@ import { Prisma } from '@eduvideogen/database';
 export class CoursesController {
     constructor(private readonly coursesService: CoursesService) { }
 
+    @Post()
+    async createCourse(@Body() dto: CreateCourseDto) {
+        return this.coursesService.createCourse(dto);
+    }
+
     @Post('generate-script')
     async generateScript(@Body() dto: CreateCourseDto) {
         return this.coursesService.generateScript(dto);
