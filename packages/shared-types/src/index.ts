@@ -98,3 +98,86 @@ export interface SmartScriptResponse {
     };
     template_data: Record<string, string>;
 }
+
+export enum SynthesiaVisibility {
+    PRIVATE = 'private',
+    PUBLIC = 'public',
+}
+
+export enum SynthesiaAspectRatio {
+    WIDESCREEN = '16:9',
+    VERTICAL = '9:16',
+    SQUARE = '1:1',
+    PORTRAIT_4_5 = '4:5',
+    PORTRAIT_5_4 = '5:4',
+}
+
+export enum SynthesiaSoundtrack {
+    CORPORATE = 'corporate',
+    INSPIRATIONAL = 'inspirational',
+    MODERN = 'modern',
+    URBAN = 'urban',
+}
+
+export interface SynthesiaAvatarSettings {
+    voice?: string;
+    horizontalAlign?: 'left' | 'center' | 'right';
+    scale?: number;
+    style?: 'rectangular' | 'circular';
+    backgroundColor?: string;
+    seamless?: boolean;
+}
+
+export interface SynthesiaVideoSettings {
+    shortBackgroundContentMatchMode?: 'freeze' | 'loop' | 'slow_down';
+    longBackgroundContentMatchMode?: 'trim' | 'speed_up';
+}
+
+export interface SynthesiaBackgroundSettings {
+    videoSettings?: SynthesiaVideoSettings;
+}
+
+export interface SynthesiaInputScene {
+    scriptText: string;
+    scriptAudio?: string;
+    scriptLanguage?: string;
+    avatar: string;
+    background: string;
+    avatarSettings?: SynthesiaAvatarSettings;
+    backgroundSettings?: SynthesiaBackgroundSettings;
+}
+
+export interface CreateVideoFromScratchPayload {
+    test?: boolean;
+    title: string;
+    description?: string;
+    visibility: SynthesiaVisibility | string;
+    aspectRatio: SynthesiaAspectRatio | string;
+    soundtrack?: SynthesiaSoundtrack | string;
+    callbackId?: string;
+    input: SynthesiaInputScene[];
+    ctaSettings?: {
+        label: string;
+        url: string;
+    };
+}
+export enum SceneObjective {
+    HOOK = 'hook',
+    EDUCATIONAL = 'educational',
+    CTA = 'call_to_action',
+    TRANSITION = 'transition',
+    JOKE = 'joke'
+}
+
+export enum SceneComplexity {
+    CHILD = 'child',
+    GENERAL = 'general',
+    TECHNICAL = 'technical',
+    ACADEMIC = 'academic'
+}
+
+export enum ScenePOV {
+    FIRST_PERSON = 'first_person', // I/We
+    SECOND_PERSON = 'second_person', // You
+    THIRD_PERSON = 'third_person' // They/The System
+}

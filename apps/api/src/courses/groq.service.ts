@@ -218,4 +218,201 @@ export class GroqService {
             throw new Error('Invalid JSON response from Groq for Smart Script');
         }
     }
+    async generateScriptFromScratch(title: string, sourceText: string, sceneCount: number, scenes: {
+        topic: string,
+        duration?: number,
+        emotion?: string,
+        visual_context?: string,
+        objective?: string,
+        complexity?: string,
+        pov?: string,
+        keywords?: string[]
+    }[]): Promise<any> {
+        const systemPrompt = `
+      Eres un experto guionista de videos educativos y un generador de JSON estricto.
+      Tu salida debe ser UNICAMENTE un objeto JSON compatible con la estructura requerida.
+      
+      Estructura de Salida (JSON):
+      {
+        "title": string,
+        "description": string,
+        "visibility": "private",
+        "input": [
+           { 
+             "scriptText": string, 
+             "avatar": "anna_costume1_cameraA", 
+             "background": "green_screen",
+             "avatarSettings": { "horizontalAlign": "center", "scale": 1.0, "style": "rectangular", "seamless": false },
+             "backgroundSettings": { "videoSettings": { "shortBackgroundContentMatchMode": "freeze", "longBackgroundContentMatchMode": "trim" } },
+             "metadata": {
+                "scene_index": number,
+                "topic": string,
+                "duration_sec": number,
+                "emotion": string,
+                "visual_context": string
+             }
+           }
+        ]
+      }
+      
+      Reglas Generales:
+      1. El array "input" debe tener EXACTAMENTE ${sceneCount} elementos.
+      2. "avatar" siempre "anna_costume1_cameraA" y "background" siempre "green_screen".
+      
+      Reglas de Generación de Guion (CRÍTICO - EMOCIÓN EN EL TEXTO):
+      1. **Duración**: Respeta la duración indicada (aprox 150 palabras/minuto).
+      2. **Emoción**: El avatar NO tiene expresiones faciales controlables. **LA EMOCIÓN DEBE ESTAR EN EL TEXTO**.
+         - Si es 'excited': Usa exclamaciones, frases cortas, palabras energéticas.
+         - Si es 'serious': Usa lenguaje formal, frases estructuradas, tono calmado.
+         - Si es 'empathetic': Usa palabras suaves, preguntas retóricas, conexión personal.
+      3. **Visuales**: Si se provee 'visual_context', úsalo para referencias ("Como vemos aquí...").
+      4. **Complejidad**: Adapta el vocabulario ('child' = simple, 'technical' = jerga técnica).
+      5. **POV**: Respeta estrictamente los pronombres (First Person = "Yo/Nosotros", Second Person = "Tú").
+      6. **Keywords**: Debes incluir las keywords obligatorias de forma natural.
+      `;
+
+        const scenesDescription = scenes.map((s, i) => `
+      Genera el texto para la **Escena ${i + 1}**.
+      - **Topic:** "${s.topic}"
+      - **Objetivo:** "${s.objective || 'educational'}" (Guiate por esto: Hook -> Atrapante; CTA -> Acción clara).
+      - **Complejidad:** "${s.complexity || 'general'}"
+      - **POV:** "${s.pov || 'second_person'}"
+      - **Emoción:** "${s.emotion || 'neutral'}" (Recuerda: refléjalo en la puntuación y tono).
+      - **Duración:** ${s.duration || 10} segundos.
+      - **Contexto Visual:** "${s.visual_context || 'N/A'}"
+      - **Keywords obligatorias:** ${s.keywords && s.keywords.length > 0 ? s.keywords.join(', ') : 'Ninguna'}
+      
+      *Instrucción:* Escribe el guion respetando estrictamente el tono, estilo y las keywords solicitadas.
+      `).join('\n\n----------------\n\n');
+
+        const userPrompt = `
+      Contexto Base: ${sourceText}
+
+      Título del Video: "${title}"
+      Cantidad de Escenas: ${sceneCount}
+
+      Instrucciones Específicas por Escena:
+      ${scenesDescription}
+
+      Genera el JSON completo:
+      `;
+
+        const completion = await this.openai.chat.completions.create({
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+            ],
+            model: 'llama-3.3-70b-versatile',
+            response_format: { type: 'json_object' },
+        });
+
+        const responseContent = completion.choices[0].message.content;
+        if (!responseContent) {
+            throw new Error('Failed to generate script from Groq');
+        }
+
+        try {
+            return JSON.parse(responseContent);
+        } catch (error) {
+            console.error("Groq response parsing error", error);
+            throw new Error('Invalid JSON response from Groq');
+        }
+    }
+
+    async regenerateScene(
+        sourceContentText: string,
+        allScenes: any[],
+        targetSceneIndex: number,
+        currentSceneData: any,
+        userFeedback?: string
+    ): Promise<any> {
+
+        // 150 palabras por minuto / 60 segundos = 2.5 palabras por segundo
+        const wordsPerSecond = 2.5;
+        const targetWordCount = Math.floor(currentSceneData.duration * wordsPerSecond);
+
+        // Damos un margen de error pequeño (+10 palabras) pero somos estrictos en el prompt
+        const maxWordLimit = targetWordCount + 10;
+
+        const systemPrompt = `
+    You are an expert Script Editor known for brevity and precision.
+    Your task is to REWRITE a single scene (Scene #${targetSceneIndex + 1}) based on User Feedback.
+    
+    CRITICAL RULE: The output must strictly adhere to the duration constraints. 
+    Verbose or overly long scripts will cause the video generation to fail.
+    
+    The output must be a valid JSON object representing ONLY the SINGLE regenerated scene.
+    Do NOT return an array.
+    
+    Structure:
+    { 
+            "scriptText": string, 
+            "avatar": "anna_costume1_cameraA", 
+            "background": "green_screen",
+            "avatarSettings": { ... },
+            "backgroundSettings": { ... },
+            "metadata": { ... }
+    }
+`;
+
+        const scenesSummary = allScenes.map((s, i) => `Scene ${i + 1}: ${s.topic} - ${s.scriptText?.substring(0, 50)}...`).join('\n');
+
+        const userPrompt = `
+    # Context
+    Source Material: "${sourceContentText}"
+    
+    # Scenes Summary (To avoid repetition)
+    ${scenesSummary}
+
+    # The Scene to Fix (Scene Index: ${targetSceneIndex})
+    Current Config: 
+    - **Topic:** "${currentSceneData.topic}"
+      - **Objective:** "${currentSceneData.objective || 'educational'}" (Guide by this: Hook -> Attractive; CTA -> Clear Action).
+      - **Complexity:** "${currentSceneData.complexity || 'general'}"
+      - **POV:** "${currentSceneData.pov || 'second_person'}"
+      - **Emotion:** "${currentSceneData.emotion || 'neutral'}" (Remember: reflect this in the tone and punctuation).
+      - **Duration:** ${currentSceneData.duration || 10} seconds.
+      - **Visual Context:** "${currentSceneData.visual_context || 'N/A'}"
+      - **Keywords:** ${currentSceneData.keywords && currentSceneData.keywords.length > 0 ? currentSceneData.keywords.join(', ') : 'N/A'}
+    
+    # LENGTH CONSTRAINTS (STRICT)
+    - Allocated Duration: ${currentSceneData.duration} seconds.
+    - Target Word Count: ~${targetWordCount} words.
+    - MAXIMUM ALLOWED WORDS: ${maxWordLimit} words.
+    
+    Previous Script (Reference ONLY - Do not expand on this):
+    "${currentSceneData.scriptText}"
+
+    # User Feedback:
+    "${userFeedback ? userFeedback : "Update script to match the provided Topic/Config."}"
+
+    # Instructions
+    1. Rewrite the scriptText to address the feedback.
+    2. STRICTLY respect the ${maxWordLimit} word limit. If the feedback requires adding information, you must REMOVE other less important details to keep the balance.
+    3. Do NOT make the text longer than the Previous Script unless the previous script was too short.
+    4. Maintain the tone defined in '${currentSceneData.emotion}'.
+    5. Do not simply append sentences. Rephrase the entire paragraph to be concise.
+`;
+
+        const completion = await this.openai.chat.completions.create({
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+            ],
+            model: 'llama-3.3-70b-versatile',
+            response_format: { type: 'json_object' },
+        });
+
+        const responseContent = completion.choices[0].message.content;
+        if (!responseContent) {
+            throw new Error('Failed to regenerate scene from Groq');
+        }
+
+        try {
+            return JSON.parse(responseContent);
+        } catch (error) {
+            console.error("Groq response parsing error", error);
+            throw new Error('Invalid JSON response from Groq');
+        }
+    }
 }

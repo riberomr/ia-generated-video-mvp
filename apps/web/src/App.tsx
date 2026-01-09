@@ -4,6 +4,11 @@ import { SavedScripts } from './components/SavedScripts';
 import { ScriptEditor } from './components/ScriptEditor';
 import { SmartScriptingPage } from './pages/SmartScriptingPage';
 
+import { VideoFromScratchPage } from './pages/VideoFromScratchPage';
+import { GenerateScriptScreen } from './pages/GenerateScriptScreen';
+import { SynthesiaScriptEditorPage } from './pages/SynthesiaScriptEditorPage';
+import { AiScriptsListScreen } from './pages/AiScriptsListScreen';
+
 function NavBar() {
     const location = useLocation();
 
@@ -34,6 +39,25 @@ function NavBar() {
                 >
                     Saved Scripts
                 </Link>
+                <Link
+                    to="/generate-script"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/generate-script')}`}
+                >
+                    AI Script Generator
+                </Link>
+                <Link
+                    to="/ai-scripts"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/ai-scripts')}`}
+                >
+                    AI Scripts
+                </Link>
+                <Link
+                    to="/video-from-scratch"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/video-from-scratch')}`}
+                >
+                    Video From Scratch
+                </Link>
+
 
             </div>
         </nav>
@@ -48,7 +72,12 @@ function App() {
                 <main className="py-6">
                     <Routes>
                         <Route path="/" element={<SmartScriptingPage />} />
+                        <Route path="/ai-scripts" element={<AiScriptsListScreen />} />
+                        <Route path="/generate-script" element={<GenerateScriptScreen />} />
+                        <Route path="/generate-script/:id" element={<GenerateScriptScreen />} />
+                        <Route path="/script-editor/:id" element={<SynthesiaScriptEditorPage />} />
                         <Route path="/saved" element={<SavedScripts />} />
+                        <Route path="/video-from-scratch" element={<VideoFromScratchPage />} />
                         <Route path="/editor/:id" element={<ScriptEditor />} />
                     </Routes>
                 </main>

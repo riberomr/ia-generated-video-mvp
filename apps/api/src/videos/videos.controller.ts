@@ -1,15 +1,116 @@
-import { Controller, Post, Get, Param, Body, Res, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Param, Body, Res, Query, NotFoundException } from '@nestjs/common';
 import { Response } from 'express';
 import { HeyGenService } from './heygen.service';
 import { SynthesiaService } from './synthesia.service';
+import { CreateVideoFromScratchDto } from './dto/create-video-from-scratch.dto';
 import { CreateSynthesiaVideoDto } from './dto/create-synthesia-video.dto';
+import { GenerateScriptDto } from './dto/generate-script.dto';
+import { GroqService } from '../courses/groq.service';
+import { PrismaService } from '../database/prisma.service';
+import { RegenerateSceneDto } from './dto/regenerate-scene.dto';
 
 @Controller('videos')
 export class VideosController {
     constructor(
         // private readonly heyGenService: HeyGenService,
-        private readonly synthesiaService: SynthesiaService
+        private readonly synthesiaService: SynthesiaService,
+        private readonly groqService: GroqService,
+        private readonly prisma: PrismaService
     ) { }
+
+    @Post('create')
+    createFromScratch(@Body() createVideoDto: CreateVideoFromScratchDto) {
+        return this.synthesiaService.createVideoFromScratch(createVideoDto);
+    }
+
+    @Post('generate-script')
+    async generateScript(@Body() generateScriptDto: GenerateScriptDto) {
+        const { title, sourceText, sceneCount, scenes } = generateScriptDto;
+
+        // 1. Create SourceContent
+        // @ts-ignore
+        const sourceContent = await this.prisma.sourceContent.create({
+            data: {
+                content: sourceText,
+                title: title // Save the source title
+            }
+        });
+
+        const scriptJson = await this.groqService.generateScriptFromScratch(title, sourceText, sceneCount, scenes);
+
+        // Persist to DB
+        // @ts-ignore
+        const savedScript = await this.prisma.synthesiaVideoScript.create({
+            data: {
+                title: scriptJson.title || title,
+                scenes: scriptJson.input,
+                sourceContentId: sourceContent.id
+            }
+        });
+
+        console.log('Generated & Saved Script:', savedScript.id);
+
+        // Return structured response
+        return {
+            id: savedScript.id,
+            sourceContent: sourceContent,
+            ...scriptJson
+        };
+    }
+
+    @Get('synthesia-video-scripts')
+    async getSynthesiaVideoScripts() {
+        // @ts-ignore
+        return this.prisma.synthesiaVideoScript.findMany({
+            orderBy: { createdAt: 'desc' },
+            include: { renderedVideos: true }
+        });
+    }
+
+    @Get('synthesia-scripts/:id')
+    async getSynthesiaScript(@Param('id') id: string) {
+        // @ts-ignore
+        const script = await this.prisma.synthesiaVideoScript.findUnique({
+            where: { id },
+            include: { sourceContent: true }
+        });
+
+        if (!script) {
+            throw new NotFoundException('Script not found');
+        }
+
+        return script;
+    }
+
+    @Patch('synthesia-scripts/:id')
+    async updateSynthesiaScript(@Param('id') id: string, @Body() body: any) {
+        // Simple update: title and scenes
+        // @ts-ignore
+        const script = await this.prisma.synthesiaVideoScript.update({
+            where: { id },
+            data: {
+                title: body.title,
+                scenes: body.scenes // Expecting Json array
+            }
+        });
+
+        return script;
+    }
+
+    @Post('synthesia-scripts/regenerate-scene')
+    async regenerateScene(@Body() dto: RegenerateSceneDto) {
+        const { sourceContentText, allScenes, targetSceneIndex, currentSceneData, userFeedback } = dto;
+
+        const regeneratedScene = await this.groqService.regenerateScene(
+            sourceContentText,
+            allScenes,
+            targetSceneIndex,
+            currentSceneData,
+            userFeedback
+        );
+
+        return regeneratedScene;
+    }
 
     // @Get('avatars')
     // async getAvatars(@Query('provider') provider: string = 'heygen') {

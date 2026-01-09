@@ -70,3 +70,32 @@ model SynthesiaVoice {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model SynthesiaVideoScript {
+  id        String   @id @default(uuid())
+  title     String
+  scenes    Json     // Array of SceneConfig
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sourceContentId String?
+  sourceContent SourceContent? @relation(fields: [sourceContentId], references: [id])
+  renderedVideos SynthesiaRenderedVideo[]
+}
+
+model SynthesiaRenderedVideo {
+  id          String   @id @default(uuid())
+  synthesiaId String
+  status      String   // e.g., 'processing', 'completed', 'failed'
+  downloadUrl String?
+  createdAt   DateTime @default(now())
+  scriptId    String?
+  script      SynthesiaVideoScript? @relation(fields: [scriptId], references: [id])
+}
+
+model SourceContent {
+  id        String   @id @default(uuid())
+  title     String?
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  scripts   SynthesiaVideoScript[]
+}

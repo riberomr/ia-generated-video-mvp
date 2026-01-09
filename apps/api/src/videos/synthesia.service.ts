@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, InternalServerErrorException, Logger } f
 import { PrismaService } from '../database/prisma.service';
 import { Script, Scene, SynthesiaTemplate, SynthesiaTemplateDetails, SynthesiaAsset } from '@eduvideogen/shared-types';
 import { CreateSynthesiaVideoDto } from './dto/create-synthesia-video.dto';
+import { CreateVideoFromScratchDto } from './dto/create-video-from-scratch.dto';
 import { GroqService } from '../courses/groq.service';
 
 
@@ -22,6 +23,39 @@ export class SynthesiaService {
     ) {
         if (!process.env.SYNTHESIA_API_KEY) {
             this.logger.warn('SYNTHESIA_API_KEY is missing. Using dummy key for development.');
+        }
+    }
+
+    async createVideoFromScratch(dto: CreateVideoFromScratchDto) {
+        this.logger.log(`Creating Video From Scratch: ${dto.title}`);
+
+        try {
+            const response = await this.fetchFromSynthesia('/videos', {
+                method: 'POST',
+                body: JSON.stringify(dto),
+            });
+
+            this.logger.log(`Video created successfully: ${response.id}`);
+
+            // ALWAYS persist to DB, regardless of scriptId
+            // @ts-ignore
+            const savedVideo = await this.prisma.synthesiaRenderedVideo.create({
+                data: {
+                    synthesiaId: response.id,
+                    status: 'processing', // Initial status
+                    scriptId: dto.scriptId || null,
+                    downloadUrl: null
+                }
+            });
+
+            return {
+                ...response,
+                id: savedVideo.id, // Return INTERNAL ID for polling
+                synthesiaId: response.id
+            };
+        } catch (error) {
+            this.logger.error(`Failed to create video from scratch: ${error.message}`);
+            throw error;
         }
     }
 
@@ -255,7 +289,17 @@ export class SynthesiaService {
     }
 
     async checkStatus(videoId: string) {
-        // 1. Retrieve RenderedVideo
+        // 1. Check New Table first (SynthesiaRenderedVideo)
+        // @ts-ignore
+        const newVideo = await this.prisma.synthesiaRenderedVideo.findUnique({
+            where: { id: videoId }
+        });
+
+        if (newVideo) {
+            return this.checkStatusNew(newVideo);
+        }
+
+        // 2. Legacy Check (RenderedVideo)
         // @ts-ignore
         const video = await this.prisma.renderedVideo.findUnique({
             where: { id: videoId },
@@ -274,7 +318,7 @@ export class SynthesiaService {
             throw new InternalServerErrorException(`Video record ${videoId} has no external ID`);
         }
 
-        // 2. Call API
+        // 3. Call API
         const response = await this.fetchFromSynthesia(`/videos/${video.externalId}`);
 
         // Synthesia V2 video object: { id, status: "complete", download: "url", ... }
@@ -300,7 +344,7 @@ export class SynthesiaService {
             }
         }
 
-        // 3. Update DB
+        // 4. Update DB
         // @ts-ignore
         const updatedVideo = await this.prisma.renderedVideo.update({
             where: { id: videoId },
@@ -315,6 +359,43 @@ export class SynthesiaService {
             status: updatedVideo.status,
             downloadUrl: updatedVideo.downloadUrl,
             provider: 'SYNTHESIA'
+        };
+    }
+
+    // Helper for new table
+    private async checkStatusNew(video: any) {
+        const response = await this.fetchFromSynthesia(`/videos/${video.synthesiaId}`);
+        const status = response.status;
+        const downloadUrl = response.download;
+
+        let newStatus = video.status;
+
+        // Map statuses
+        // status: 'created', 'queued', 'in_progress', 'complete'
+        // We used lowercase 'processing', 'completed', 'failed' in schema comment?
+        // Schema comment: // e.g., 'processing', 'completed', 'failed'
+        // Let's stick to raw or normalized? The prompt examples used lowercase.
+
+        if (status === 'complete') newStatus = 'completed';
+        else if (status === 'in_progress') newStatus = 'processing';
+        else if (['created', 'queued'].includes(status)) newStatus = 'processing'; // or 'pending' if we want distinction
+        else if (status === 'failed' || status === 'error') newStatus = 'failed';
+
+        // Update DB
+        // @ts-ignore
+        const updated = await this.prisma.synthesiaRenderedVideo.update({
+            where: { id: video.id },
+            data: {
+                status: newStatus,
+                downloadUrl: downloadUrl || video.downloadUrl
+            }
+        });
+
+        return {
+            videoId: updated.id,
+            status: updated.status,
+            downloadUrl: updated.downloadUrl, // Front end expects this
+            synthesiaId: updated.synthesiaId
         };
     }
 }
