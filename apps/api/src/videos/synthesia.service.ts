@@ -10,6 +10,8 @@ type GetTemplatesParams = {
     source?: string;
 }
 
+import { GetAvatarsFilterDto } from './dto/get-avatars-filter.dto';
+
 @Injectable()
 export class SynthesiaService {
     private readonly logger = new Logger(SynthesiaService.name);
@@ -24,6 +26,99 @@ export class SynthesiaService {
         if (!process.env.SYNTHESIA_API_KEY) {
             this.logger.warn('SYNTHESIA_API_KEY is missing. Using dummy key for development.');
         }
+    }
+
+    async getLibrary(filters: GetAvatarsFilterDto) {
+        const where: any = {};
+
+        // 1. Gender (Direct Column)
+        if (filters.gender) {
+            where.gender = { equals: filters.gender, mode: 'insensitive' };
+        }
+
+        // 2. Framing (JSON Top Level)
+        // metadata -> framing
+        // if (filters.framing) {
+        //     if (!where.metadata) where.metadata = {};
+        //     where.metadata = {
+        //         ...where.metadata,
+        //         path: ['framing'],
+        //         equals: filters.framing
+        //     };
+        // }
+
+        // 3. Zoom (JSON Nested)
+        // metadata -> shot -> zoom
+        const andConditions: any[] = [];
+
+        // Handling JSON filters using AND to allow multiple constraints on 'metadata'
+
+
+        if (filters.shotZoom) {
+            andConditions.push({
+                metadata: {
+                    path: ['shot', 'zoom'],
+                    equals: filters.shotZoom
+                }
+            });
+        }
+
+        if (filters.shotCamera) {
+            andConditions.push({
+                metadata: {
+                    path: ['shot', 'camera'],
+                    equals: filters.shotCamera
+                }
+            });
+        }
+
+        if (filters.gaze) {
+            andConditions.push({
+                metadata: {
+                    path: ['shot', 'gaze'],
+                    equals: filters.gaze
+                }
+            });
+        }
+
+        if (filters.subject) {
+            andConditions.push({
+                metadata: {
+                    path: ['shot', 'subject'],
+                    equals: filters.subject
+                }
+            });
+        }
+
+
+        if (filters.search) {
+
+            andConditions.push({
+                OR: [
+                    { name: { contains: filters.search, mode: 'insensitive' } },
+                    { metadata: { path: ['userDescription'], string_contains: filters.search } }
+                ]
+            });
+        }
+
+        if (andConditions.length > 0) {
+            where.AND = andConditions;
+        }
+
+        // @ts-ignore
+        const avatars = await this.prisma.synthesiaScrappedAvatar.findMany({
+            where,
+            orderBy: { name: 'asc' }
+        });
+
+        // Map to Frontend Interface
+        return avatars.map((a: any) => ({
+            id: a.id,
+            name: a.name,
+            gender: a.gender,
+            imageUrl: a.imageUrl,
+            metadata: a.metadata,
+        }));
     }
 
     async createVideoFromScratch(dto: CreateVideoFromScratchDto) {

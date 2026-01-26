@@ -4,6 +4,7 @@ import { HeyGenService } from './heygen.service';
 import { SynthesiaService } from './synthesia.service';
 import { CreateVideoFromScratchDto } from './dto/create-video-from-scratch.dto';
 import { CreateSynthesiaVideoDto } from './dto/create-synthesia-video.dto';
+import { GetAvatarsFilterDto } from './dto/get-avatars-filter.dto';
 import { GenerateScriptDto } from './dto/generate-script.dto';
 import { GroqService } from '../courses/groq.service';
 import { PrismaService } from '../database/prisma.service';
@@ -147,6 +148,11 @@ export class VideosController {
     @Get('synthesia/assets/:user_media_asset_id')
     async getSynthesiaAssets(@Param('user_media_asset_id') user_media_asset_id: string) {
         return this.synthesiaService.getAssets({ user_media_asset_id });
+    }
+
+    @Get('synthesia/avatars/library')
+    async getSynthesiaAvatarLibrary(@Query() filters: GetAvatarsFilterDto) {
+        return this.synthesiaService.getLibrary(filters);
     }
 
     @Post('generate/:scriptId')

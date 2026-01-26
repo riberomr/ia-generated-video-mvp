@@ -18,7 +18,9 @@
     "packages/*"
   ],
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@aws-sdk/client-s3": "^3.971.0",
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^17.2.3"
   },
   "overrides": {
     "glob": "^10.3.10",

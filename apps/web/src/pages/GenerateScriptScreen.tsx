@@ -253,7 +253,7 @@ export const GenerateScriptScreen = () => {
 
             if (!response.ok) throw new Error('Failed to update script');
 
-            const json = await response.json();
+            await response.json();
             alert("Script updated successfully!");
             // Optionally refresh or just update state? The form is already up to date.
 

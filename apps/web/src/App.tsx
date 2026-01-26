@@ -8,6 +8,8 @@ import { VideoFromScratchPage } from './pages/VideoFromScratchPage';
 import { GenerateScriptScreen } from './pages/GenerateScriptScreen';
 import { SynthesiaScriptEditorPage } from './pages/SynthesiaScriptEditorPage';
 import { AiScriptsListScreen } from './pages/AiScriptsListScreen';
+import { AssetsPage } from './pages/AssetsPage';
+import { AvatarLibraryPage } from './pages/AvatarLibraryPage';
 
 function NavBar() {
     const location = useLocation();
@@ -57,6 +59,18 @@ function NavBar() {
                 >
                     Video From Scratch
                 </Link>
+                <Link
+                    to="/assets"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/assets')}`}
+                >
+                    Assets
+                </Link>
+                <Link
+                    to="/avatars"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/avatars')}`}
+                >
+                    Avatars
+                </Link>
 
 
             </div>
@@ -79,6 +93,8 @@ function App() {
                         <Route path="/saved" element={<SavedScripts />} />
                         <Route path="/video-from-scratch" element={<VideoFromScratchPage />} />
                         <Route path="/editor/:id" element={<ScriptEditor />} />
+                        <Route path="/assets" element={<AssetsPage />} />
+                        <Route path="/avatars" element={<AvatarLibraryPage />} />
                     </Routes>
                 </main>
             </div>

@@ -99,3 +99,31 @@ model SourceContent {
   createdAt DateTime @default(now())
   scripts   SynthesiaVideoScript[]
 }
+
+enum SynthesiaAssetType {
+  IMAGE
+  VIDEO
+  AUDIO
+}
+
+model SynthesiaAsset {
+  id             String             @id @default(uuid())
+  originalName   String
+  mimeType       String
+  minioObjectKey String
+  synthesiaId    String
+  title          String?
+  type           SynthesiaAssetType
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model SynthesiaScrappedAvatar {
+  id        String   @id
+  name      String
+  gender    String?
+  imageUrl  String
+  metadata  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
