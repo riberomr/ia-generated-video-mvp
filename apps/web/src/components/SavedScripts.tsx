@@ -117,7 +117,7 @@ export const SavedScripts: React.FC = () => {
                                                 disabled={generating === script.id}
                                                 className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                                             >
-                                                {generating === script.id ? 'Starting...' : 'Generar Video'}
+                                                {generating === script.id ? 'Starting...' : 'Generate Video'}
                                             </button>
                                         </div>
 

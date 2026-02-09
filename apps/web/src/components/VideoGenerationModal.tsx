@@ -157,7 +157,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
             // Extract voice script for payload verification (backend handles actual mapping)
             payload = {
                 provider: 'synthesia',
-                test: true,
+                test: false,
                 templateId: script.templateId,
                 templateData: script.templateData || {},
                 title: `Smart Video - ${new Date().toLocaleString()}`,

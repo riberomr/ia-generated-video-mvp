@@ -29,11 +29,12 @@ function NavBar() {
                 >
                     Generate Script
                 </Link> */}
+                {/* <div className="h-full w-px bg-gray-200 mx-2"></div> */}
                 <Link
                     to="/"
                     className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/')}`}
                 >
-                    Template based Scripting
+                    Template Scripting
                 </Link>
                 <Link
                     to="/saved"
@@ -41,6 +42,7 @@ function NavBar() {
                 >
                     Saved Scripts
                 </Link>
+                <div className="h-full w-px bg-gray-200 mx-2"></div>
                 <Link
                     to="/generate-script"
                     className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/generate-script')}`}
@@ -59,6 +61,7 @@ function NavBar() {
                 >
                     Video From Scratch
                 </Link>
+                <div className="h-full w-px bg-gray-200 mx-2"></div>
                 <Link
                     to="/assets"
                     className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/assets')}`}
@@ -71,7 +74,7 @@ function NavBar() {
                 >
                     Avatars
                 </Link>
-
+                    
 
             </div>
         </nav>

@@ -3,8 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { Scene, UpdateScriptDto, Script } from '@eduvideogen/shared-types';
-import { VisualsEditor } from './SmartScripting/VisualsEditor';
-import { ScriptEditor as SmartScriptEditor } from './SmartScripting/ScriptEditor';
+import { FullScriptEditor } from './SmartScripting/FullScriptEditor';
 
 interface ScriptEditorForm {
     scenes: Scene[];
@@ -58,7 +57,7 @@ export function ScriptEditor() {
 
         fetchScript();
     }, [id, reset]);
-
+console.log(script, 'smartTemplateData')
     const handleLegacySubmit = async (data: ScriptEditorForm) => {
         if (!id) return;
         setSaving(true);
@@ -126,42 +125,33 @@ export function ScriptEditor() {
     console.log(smartTemplateData);
     if (script?.isTemplated) {
         return (
-            <div className="max-w-6xl mx-auto p-6">
+            <div className="max-w-4xl mx-auto p-6">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold">Edit Smart Script</h1>
-                    <button
-                        onClick={handleSmartSave}
-                        disabled={saving}
-                        className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
-                    >
-                        {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => navigate('/saved')}
+                            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSmartSave}
+                            disabled={saving}
+                            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                            {saving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <h2 className="text-xl font-bold mb-4">Visual Variables</h2>
-                        <VisualsEditor
-                            data={smartTemplateData}
-                            onChange={(newData) => setSmartTemplateData(newData)}
-                        />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold mb-4">Voice Script</h2>
-                        <SmartScriptEditor
-                            data={smartTemplateData}
-                            onChange={(newData) => setSmartTemplateData(newData)}
-                        />
-                    </div>
-                </div>
-                <div className="mt-8 flex justify-end">
-                    <button
-                        onClick={() => navigate('/saved')}
-                        className="text-gray-600 hover:text-gray-900 underline"
-                    >
-                        Back to Saved Scripts
-                    </button>
-                </div>
+                <FullScriptEditor
+                    data={smartTemplateData}
+                    onChange={(newData) => setSmartTemplateData(newData)}
+                    title={(script as any).course?.topic || 'Smart Script'}
+                />
+
+
             </div>
         )
     }

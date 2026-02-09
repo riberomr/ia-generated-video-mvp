@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SynthesiaTemplate, AnalyzeScriptDto, SmartScriptResponse, CreateScriptDto } from '@eduvideogen/shared-types';
 import { TemplateSelector } from '../components/SmartScripting/TemplateSelector';
 import { InputSection } from '../components/SmartScripting/InputSection';
-import { ScriptEditor } from '../components/SmartScripting/ScriptEditor';
-import { VisualsEditor } from '../components/SmartScripting/VisualsEditor';
+import { FullScriptEditor } from '../components/SmartScripting/FullScriptEditor';
 
 export function SmartScriptingPage() {
     const navigate = useNavigate();
@@ -132,22 +131,13 @@ export function SmartScriptingPage() {
             )}
 
             {step === 3 && smartScript && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <h2 className="text-xl font-bold mb-4">Visual Variables</h2>
-                        <VisualsEditor
-                            data={smartScript.template_data}
-                            onChange={(newData) => setSmartScript({ ...smartScript, template_data: newData })}
-                        />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold mb-4">Voice Script</h2>
-                        <ScriptEditor
-                            data={smartScript.template_data}
-                            onChange={(newData) => setSmartScript({ ...smartScript, template_data: newData })}
-                        />
-                    </div>
-                    <div className="col-span-full mt-4 flex justify-end space-x-4">
+                <div>
+                    <FullScriptEditor
+                        data={smartScript.template_data}
+                        onChange={(newData) => setSmartScript({ ...smartScript, template_data: newData })}
+                        title={topic}
+                    />
+                    <div className="mt-8 flex justify-end space-x-4">
                         <button onClick={() => setStep(2)} className="px-6 py-2 border rounded hover:bg-gray-50">Back</button>
                         <button onClick={() => handleSave(smartScript.template_data)} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">Save Script</button>
                     </div>
