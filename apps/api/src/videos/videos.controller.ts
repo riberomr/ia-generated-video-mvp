@@ -1,22 +1,24 @@
-import { Controller, Post, Get, Patch, Param, Body, Res, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Param, Body, Res, Query, NotFoundException, UseInterceptors, UploadedFiles } from '@nestjs/common';
 import { Response } from 'express';
-import { HeyGenService } from './heygen.service';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileExtractionService } from './file-extraction.service';
+
 import { SynthesiaService } from './synthesia.service';
 import { CreateVideoFromScratchDto } from './dto/create-video-from-scratch.dto';
 import { CreateSynthesiaVideoDto } from './dto/create-synthesia-video.dto';
 import { GetAvatarsFilterDto } from './dto/get-avatars-filter.dto';
 import { GenerateScriptDto } from './dto/generate-script.dto';
-import { GroqService } from '../courses/groq.service';
+import { ScriptGeneratorService } from '../courses/script-generator.service';
 import { PrismaService } from '../database/prisma.service';
 import { RegenerateSceneDto } from './dto/regenerate-scene.dto';
 
 @Controller('videos')
 export class VideosController {
     constructor(
-        // private readonly heyGenService: HeyGenService,
         private readonly synthesiaService: SynthesiaService,
-        private readonly groqService: GroqService,
-        private readonly prisma: PrismaService
+        private readonly scriptGeneratorService: ScriptGeneratorService,
+        private readonly prisma: PrismaService,
+        private readonly fileExtractionService: FileExtractionService
     ) { }
 
     @Post('create')
@@ -37,7 +39,7 @@ export class VideosController {
             }
         });
 
-        const scriptJson = await this.groqService.generateScriptFromScratch(title, sourceText, sceneCount, scenes);
+        const scriptJson = await this.scriptGeneratorService.generateScriptFromScratch(title, sourceText, sceneCount, scenes);
 
         // Persist to DB
         // @ts-ignore
@@ -57,6 +59,134 @@ export class VideosController {
             sourceContent: sourceContent,
             ...scriptJson
         };
+    }
+
+    @Post('generate-from-files')
+    @UseInterceptors(FilesInterceptor('files'))
+    async generateScriptFromFiles(
+        @UploadedFiles() files: Array<Express.Multer.File>,
+        @Body() body: any
+    ) {
+        // Extract metadata from body
+        const {
+            title,
+            teacherName,
+            teacherRole,
+            teacherSpecialty,
+            instructionalDesigner,
+            tone,
+            style,
+            studentProfile,
+            courseName,
+            templateId 
+        } = body;
+        
+        if (!files || files.length === 0) {
+            throw new NotFoundException('No files uploaded');
+        }
+
+        let combinedText = '';
+
+        for (const file of files) {
+            combinedText += `\n--- START OF FILE: ${file.originalname} ---\n`;
+            
+            if (file.mimetype === 'application/pdf') {
+                combinedText += await this.fileExtractionService.extractTextFromPdf(file.buffer);
+            } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') { // docx
+                combinedText += await this.fileExtractionService.extractTextFromDocx(file.buffer);
+            } else {
+                combinedText += `[Unsupported file type: ${file.mimetype}]`;
+            }
+            combinedText += `\n--- END OF FILE: ${file.originalname} ---\n`;
+        }
+
+        // 1. Create SourceContent
+        // @ts-ignore
+        const sourceContent = await this.prisma.sourceContent.create({
+            data: {
+                content: combinedText,
+                title: title || 'Generated from Files'
+            }
+        });
+
+        if (templateId) {
+            // --- TEMPLATE FLOW ---
+            
+            // 1. Fetch Template Details
+            const template = await this.synthesiaService.getTemplateDetails(templateId);
+            
+            // 2. Map Script to Template
+            const templateJson = JSON.stringify({ variables: template.variables });
+            
+            const templateData = await this.scriptGeneratorService.mapTechnicalSheetToTemplate(combinedText, templateJson, {
+                teacherName, teacherRole, teacherSpecialty, instructionalDesigner, tone, style, studentProfile, courseName
+            });
+
+            // 3. Create Course (Required for Script)
+            // @ts-ignore
+            const course = await this.prisma.course.create({
+                data: {
+                    topic: courseName || title || 'Course from Files',
+                    rawContent: combinedText.substring(0, 5000) // Truncate if too long? Text is usually OK.
+                }
+            });
+
+            // 4. Create Script (Templated)
+            // @ts-ignore
+            const savedScript = await this.prisma.script.create({
+                data: {
+                    courseId: course.id,
+                    scenes: [], // Templated scripts store data in templateData
+                    originalScenes: [],
+                    status: 'DRAFT',
+                    isTemplated: true,
+                    templateId: templateId,
+                    templateData: templateData
+                }
+            });
+            
+             console.log('Generated & Saved Templated Script:', savedScript.id);
+
+            return {
+                id: savedScript.id,
+                type: 'SCRIPT', // Signals frontend to use /editor/:id
+                templateId,
+                templateData
+            };
+
+        } else {
+            // --- EXISTING (FROM SCRATCH) FLOW ---
+            
+            const scriptJson = await this.scriptGeneratorService.generateScriptWithTechnicalSheet(combinedText, {
+                teacherName,
+                teacherRole,
+                teacherSpecialty,
+                instructionalDesigner,
+                tone,
+                style,
+                studentProfile,
+                courseName: courseName || title 
+            });
+    
+            // Persist to DB (Legacy SynthesiaVideoScript)
+            // @ts-ignore
+            const savedScript = await this.prisma.synthesiaVideoScript.create({
+                data: {
+                    title: scriptJson.title || title || 'Untitled Script',
+                    scenes: scriptJson.input,
+                    sourceContentId: sourceContent.id
+                }
+            });
+    
+            console.log('Generated & Saved Script from Files (Scratch):', savedScript.id);
+    
+            return {
+                id: savedScript.id,
+                type: 'SYNTHESIA_VIDEO_SCRIPT', // Signals frontend to show raw JSON or use legacy view
+                sourceContent: sourceContent,
+                ...scriptJson
+            };
+        }
     }
 
     @Get('synthesia-video-scripts')
@@ -102,7 +232,7 @@ export class VideosController {
     async regenerateScene(@Body() dto: RegenerateSceneDto) {
         const { sourceContentText, allScenes, targetSceneIndex, currentSceneData, userFeedback } = dto;
 
-        const regeneratedScene = await this.groqService.regenerateScene(
+        const regeneratedScene = await this.scriptGeneratorService.regenerateScene(
             sourceContentText,
             allScenes,
             targetSceneIndex,
@@ -113,27 +243,15 @@ export class VideosController {
         return regeneratedScene;
     }
 
-    // @Get('avatars')
-    // async getAvatars(@Query('provider') provider: string = 'heygen') {
-    //     if (provider.toLowerCase() === 'synthesia') {
-    //         return this.synthesiaService.getAvatars();
-    //     }
-    //     return this.heyGenService.getAvatars();
-    // }
+    @Get('avatars')
+    async getAvatars() {
+        return this.synthesiaService.getAvatars();
+    }
 
-    // @Get('voices')
-    // async getVoices(@Query('provider') provider: string = 'heygen') {
-    //     if (provider.toLowerCase() === 'synthesia') {
-    //         return this.synthesiaService.getVoices();
-    //     }
-    //     return this.heyGenService.getVoices();
-    // }
-
-    // @Get('voices/locales')
-    // async getVoicesLocales() {
-    //     // Synthesia might not have this exact equivalent exposed cleanly, defaulting to HeyGen for now
-    //     return this.heyGenService.getVoicesLocales();
-    // }
+    @Get('voices')
+    async getVoices() {
+        return this.synthesiaService.getVoices();
+    }
 
     @Get('synthesia/templates')
     async getSynthesiaTemplates(@Query('source') source: string) {
@@ -158,80 +276,32 @@ export class VideosController {
     @Post('generate/:scriptId')
     async generateVideo(
         @Param('scriptId') scriptId: string,
-        @Body() body: any // Relaxed type to handle both providers
+        @Body() body: any 
     ) {
-        if (body.provider?.toLowerCase() === 'synthesia') {
-            return this.synthesiaService.generateVideo(scriptId, body as CreateSynthesiaVideoDto);
-        }
-        // return this.heyGenService.generateVideo(scriptId, body);
+        // Default to Synthesia
+        return this.synthesiaService.generateVideo(scriptId, body as CreateSynthesiaVideoDto);
     }
 
     @Get('status/:videoId')
     async checkStatus(@Param('videoId') videoId: string) {
-        // Need to check which provider was used for this video
-        // We can either fetch the video first to check provider, or try both (inefficient), 
-        // or - better - add a query param? But usually status check just has ID.
-        // Let's modify the service to be smart or just try one then the other? 
-        // Actually, since we added 'provider' to DB, we should fetch DB record first in a common service or here.
-        // For MVP, since the Services do a DB lookup anyway, we can let them fail if ID not found or...
-        // Better approach: Peek at the DB record here? Or just try HeyGen defaults.
-        // Let's refactor slightly to be safer:
-        // Actually, the services throw 'NotFound'.
-
-        // IMPORTANT: We need to know who to ask.
-        // I will delegate this logic to the specific service that owns the ID.
-        // BUT, since we don't know yet, I'll cheat slightly for MVP and check HeyGen DB record via HeyGenService first? 
-        // No, HeyGenService.checkStatus reads the DB.
-
-        // Let's inject PrismaService here or just assume we can call HeyGenService.
-        // *Self-correction*: If I call HeyGenService.checkStatus, it fetches the video. If provider is SYNTHESIA, it might fail or proceed weirdly.
-        // I should update HeyGenService and SynthesiaService to check the provider field they read.
-        // AND/OR: I'll try HeyGen first, if it throws/returns error related to provider, try Synthesia?
-        // CLEANER: Inject Prisma here and check provider.
-        // BUT I cannot easily inject PrismaService into Controller directly without Module export (it is likely exported).
-        // Let's assume PrismaService is available via one of the services.
-
-        // Alternative: The user asked for "SynthesiaService" to be modular.
-        // I'll try to determine provider by checking who claims it.
-        // For this step, I'll leave it simple:
-        // If I can't easily check DB, I might need to rely on the client knowing... but client just polls /status/:id.
-        // I will modify the logic to use a helper or try/catch.
-
-        // Let's try to fetch via HeyGenService. If the service sees 'provider: SYNTHESIA', it should return or throw specific.
-        // I'll update the services to be smart about 'provider' field.
-
-        // For now, I'll default to HeyGen, but if it fails (not found), try Synthesia? 
-        // The ID is unique (UUID).
-        // I'll implement a simple "Router" logic here by using one of the services to peek, or just try both.
-        // Trying both is safest without direct DB access here.
-
-        // try {
-        //     return await this.heyGenService.checkStatus(videoId);
-        // } catch (e) {
-        // If HeyGen says "Not Found" or "Not HeyGen", try Synthesia
+        // Only check Synthesia
         try {
             return await this.synthesiaService.checkStatus(videoId);
-        } catch (e2) {
-            throw new NotFoundException('Video not found in any provider');
+        } catch (e) {
+            throw new NotFoundException('Video not found');
         }
-        // }
     }
 
     @Get(':videoId/redirect')
     async redirectVideo(@Param('videoId') videoId: string, @Res() res: Response) {
         let downloadUrl: string | undefined;
 
-        // try {
-        //     const status = await this.heyGenService.checkStatus(videoId);
-        //     downloadUrl = status.downloadUrl;
-        // } catch (e) {
         try {
             const status = await this.synthesiaService.checkStatus(videoId);
             downloadUrl = status.downloadUrl;
-        } catch (e2) {
+        } catch (e) {
             return res.status(404).send('Video not found');
         }
-        // }
 
         if (downloadUrl) {
             return res.redirect(downloadUrl);

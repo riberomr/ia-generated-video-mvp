@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { GroqService } from '../courses/groq.service';
+import { ScriptGeneratorService } from '../courses/script-generator.service';
 import { SynthesiaService } from '../videos/synthesia.service';
 import { AnalyzeScriptDto, SmartScriptResponse, CreateScriptDto } from '@eduvideogen/shared-types';
 
@@ -10,7 +10,7 @@ export class ScriptsService {
 
     constructor(
         private readonly prisma: PrismaService,
-        private readonly groqService: GroqService,
+        private readonly scriptGeneratorService: ScriptGeneratorService,
         private readonly synthesiaService: SynthesiaService
     ) { }
 
@@ -38,9 +38,9 @@ export class ScriptsService {
             variables: template.variables || {}
         }, null, 2);
 
-        // 4. Call Groq
+        // 4. Call Groq (via ScriptGeneratorService)
         this.logger.log(`Calling Groq to map source text to ${sceneCount} scenes.`);
-        const result = await this.groqService.analyzeAndMapScript(
+        const result = await this.scriptGeneratorService.analyzeAndMapScript(
             dto.topic,
             dto.sourceText,
             templateJson,

@@ -22,7 +22,8 @@ interface VideoGenerationModalProps {
 }
 
 export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOpen, onClose, onGenerate, script }) => {
-    const [selectedProvider, setSelectedProvider] = useState<'heygen' | 'synthesia' | ''>('');
+    // Hardcoded to Synthesia
+    // const selectedProvider = 'synthesia';
     const [mode, setMode] = useState<'basic' | 'template'>('basic');
 
     // Basic Mode Assets
@@ -41,49 +42,33 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Reset state when modal opens/closes or provider changes
+    // Reset state when modal opens
     useEffect(() => {
-        if (!isOpen) {
-            setSelectedProvider('');
-            // Reset other states if needed
-        } else if (script?.isTemplated) {
-            // Auto-select provider for templated scripts to setup logic, 
-            // though UI won't show the selector.
-            setSelectedProvider('synthesia');
-        }
-    }, [isOpen, script]);
-
-    // Fetch assets based on provider and mode
-    useEffect(() => {
-        if (isOpen && selectedProvider) {
+        if (isOpen) {
+            // Always fetch assets on open if not templated (or need basic assets)
             if (script?.isTemplated) {
-                // Do not fetch basic assets or template list for already templated scripts
                 return;
             }
-
-            if (selectedProvider === 'heygen') {
-                fetchBasicAssets('heygen');
-            } else if (selectedProvider === 'synthesia') {
-                if (mode === 'basic') fetchBasicAssets('synthesia');
-                else fetchTemplateAssets();
-            }
+            if (mode === 'basic') fetchBasicAssets();
+            else fetchTemplateAssets();
         }
-    }, [isOpen, selectedProvider, mode, script]);
+    }, [isOpen, mode, script]);
 
     // Fetch template details when a template is selected
     useEffect(() => {
-        if (selectedTemplate && selectedProvider === 'synthesia' && !script?.isTemplated) {
+        if (selectedTemplate && !script?.isTemplated) {
             fetchTemplateDetails(selectedTemplate);
         }
     }, [selectedTemplate, script]);
 
-    const fetchBasicAssets = async (provider: string) => {
+    const fetchBasicAssets = async () => {
         setLoading(true);
         setError(null);
         try {
+            // Use the restored generic endpoints which now point to Synthesia
             const [avatarRes, voiceRes] = await Promise.all([
-                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/avatars?provider=${provider}`),
-                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/voices?provider=${provider}`)
+                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/avatars`),
+                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/voices`)
             ]);
 
             if (!avatarRes.ok) throw new Error('Failed to fetch avatars');
@@ -116,11 +101,13 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
         try {
             const [templatesRes, assetsRes] = await Promise.all([
                 fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/synthesia/templates`),
-                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/synthesia/assets`)
+                fetch(`${import.meta.env.VITE_APP_BASE_URL}/videos/synthesia/assets`) // Ensure this endpoint exists or remove if unused in this context
             ]);
 
             if (!templatesRes.ok) throw new Error('Failed to fetch templates');
             const templatesData = await templatesRes.json();
+            
+            // Assets might be needed for template variable filling (images)
             const assetsData = assetsRes.ok ? await assetsRes.json() : [];
 
             setTemplates(templatesData);
@@ -150,11 +137,10 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
     };
 
     const handleGenerate = () => {
-        let payload: any = { provider: selectedProvider };
+        let payload: any = { provider: 'synthesia' };
 
         if (script?.isTemplated) {
             // Templated Script Confirmation
-            // Extract voice script for payload verification (backend handles actual mapping)
             payload = {
                 provider: 'synthesia',
                 test: false,
@@ -164,16 +150,14 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
                 description: 'Generated via Smart Scripting'
             };
         }
-        else if (!selectedProvider) return;
-
-        else if (selectedProvider === 'synthesia' && mode === 'template') {
+        else if (mode === 'template') {
             payload = {
                 ...payload,
                 templateId: selectedTemplate,
                 templateData: templateFormData,
             };
         } else {
-            // Basic Mode (HeyGen or Synthesia Basic)
+            // Basic Mode
             payload = {
                 ...payload,
                 avatarId: selectedAvatar,
@@ -196,7 +180,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
                 <div className="bg-white rounded-lg p-6 m shadow-xl relative">
-                    <button onClick={onClose} className="absolute top-4 right-4 tew-full max-w-sxt-gray-400 hover:text-gray-600">✕</button>
+                    <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">✕</button>
                     <h2 className="text-xl font-bold mb-4 text-gray-800">Generate Smart Video</h2>
                     <p className="text-gray-600 mb-6">
                         This is a pre-configured Smart Script. Are you sure you want to generate the video now?
@@ -220,46 +204,28 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
             <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-xl relative max-h-[90vh] overflow-y-auto">
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">✕</button>
                 <h2 className="text-2xl font-bold mb-4 text-gray-800">Generate Video</h2>
-
-                {/* Provider Selection */}
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Provider</label>
-                    <select
-                        value={selectedProvider}
-                        onChange={(e) => {
-                            setSelectedProvider(e.target.value as any);
-                            setMode('basic'); // Reset mode on provider change
-                        }}
-                        className="w-full border border-gray-300 rounded-md shadow-sm p-2"
+                
+                {/* Mode Selection */}
+                <div className="flex mb-6 border-b">
+                    <button
+                        className={`px-4 py-2 border-b-2 font-medium ${mode === 'basic' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setMode('basic')}
                     >
-                        <option value="">-- Select a Provider --</option>
-                        <option value="heygen">HeyGen</option>
-                        <option value="synthesia">Synthesia</option>
-                    </select>
+                        Basic
+                    </button>
+                    <button
+                        className={`px-4 py-2 border-b-2 font-medium ${mode === 'template' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        onClick={() => setMode('template')}
+                    >
+                        Template
+                    </button>
                 </div>
-
-                {selectedProvider === 'synthesia' && (
-                    <div className="flex mb-4 border-b">
-                        <button
-                            className={`px-4 py-2 border-b-2 font-medium ${mode === 'basic' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}
-                            onClick={() => setMode('basic')}
-                        >
-                            Basic
-                        </button>
-                        <button
-                            className={`px-4 py-2 border-b-2 font-medium ${mode === 'template' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'}`}
-                            onClick={() => setMode('template')}
-                        >
-                            Template
-                        </button>
-                    </div>
-                )}
 
                 {loading ? (
                     <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>
                 ) : error ? (
                     <div className="p-4 bg-red-50 text-red-600 rounded mb-4">{error}</div>
-                ) : selectedProvider && (
+                ) : (
                     <div className="space-y-4">
                         {(mode === 'basic') ? (
                             <>
@@ -343,7 +309,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({ isOp
                     <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200">Cancel</button>
                     <button
                         onClick={handleGenerate}
-                        disabled={loading || !selectedProvider || (mode === 'basic' && (!selectedAvatar || !selectedVoice)) || (mode === 'template' && !selectedTemplate)}
+                        disabled={loading || (mode === 'basic' && (!selectedAvatar || !selectedVoice)) || (mode === 'template' && !selectedTemplate)}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
                     >
                         Generate Video

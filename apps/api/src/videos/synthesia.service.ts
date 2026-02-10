@@ -3,7 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { Script, Scene, SynthesiaTemplate, SynthesiaTemplateDetails, SynthesiaAsset } from '@eduvideogen/shared-types';
 import { CreateSynthesiaVideoDto } from './dto/create-synthesia-video.dto';
 import { CreateVideoFromScratchDto } from './dto/create-video-from-scratch.dto';
-import { GroqService } from '../courses/groq.service';
+
 
 
 type GetTemplatesParams = {
@@ -20,8 +20,7 @@ export class SynthesiaService {
     private readonly baseUrl = 'https://api.synthesia.io/v2';
 
     constructor(
-        private readonly prisma: PrismaService,
-        private readonly groqService: GroqService
+        private readonly prisma: PrismaService
     ) {
         if (!process.env.SYNTHESIA_API_KEY) {
             this.logger.warn('SYNTHESIA_API_KEY is missing. Using dummy key for development.');
@@ -188,7 +187,6 @@ export class SynthesiaService {
 
     /**
      * Synthesia API V2 to list avatars.
-     * Mapped to match HeyGen's response structure for frontend compatibility where reasonable.
      */
     /**
      * Get list of Avatars from local database.
@@ -290,85 +288,72 @@ export class SynthesiaService {
     // }
 
     async generateVideo(scriptId: string, dto: CreateSynthesiaVideoDto) {
-        // 1. Retrieve Script
+        // 1. Try to find Generic Script
         // @ts-ignore
         const script = await this.prisma.script.findUnique({
             where: { id: scriptId },
         });
 
-        if (!script) {
-            throw new NotFoundException(`Script with ID ${scriptId} not found`);
+        if (script) {
+            // --- GENERIC SCRIPT FLOW ---
+            return this.generateGenericScriptVideo(script, dto);
         }
 
-        let input: any[] = [];
-        let test = dto.test !== undefined ? dto.test : true; // Default to test=true
+        // 2. Try to find Legacy SynthesiaVideoScript
+        // @ts-ignore
+        const legacyScript = await this.prisma.synthesiaVideoScript.findUnique({
+            where: { id: scriptId }
+        });
+
+        if (legacyScript) {
+             // --- LEGACY SCRIPT FLOW ---
+             return this.generateLegacyScriptVideo(legacyScript, dto);
+        }
+
+        throw new NotFoundException(`Script with ID ${scriptId} not found in Script or SynthesiaVideoScript`);
+    }
+
+    private async generateGenericScriptVideo(script: any, dto: CreateSynthesiaVideoDto) {
         let endpoint = '/videos';
         let payload: any = {};
+        const test = dto.test !== undefined ? dto.test : true;
 
-        // Case 1: Templated Script (New Logic)
-        const typedScript = script as unknown as Script;
-        if (typedScript.isTemplated && typedScript.templateId) {
+        if (script.isTemplated && script.templateId) {
             endpoint = '/videos/fromTemplate';
-
-            // 1.1 Validation
-            if (!typedScript.templateId) throw new InternalServerErrorException("Templated script missing templateId");
-
-            // 1.2 Construct Input Data from Template Data (Source of Truth)
-            const dbTemplateData = (typedScript.templateData as Record<string, any>) || {};
+            const dbTemplateData = (script.templateData as Record<string, any>) || {};
             let templateData = { ...dbTemplateData };
-
-            // 1.3 Voice Script is already inside templateData as scene_voice_text_N
-            // No need to merge manually.
-
-            // Merge any overrides from DTO
             if (dto.templateData) {
                 templateData = { ...templateData, ...dto.templateData };
             }
 
             payload = {
                 test: test,
-                templateId: typedScript.templateId,
+                templateId: script.templateId,
                 templateData: templateData,
-                title: dto.title || `Script ${scriptId}`,
+                title: dto.title || `Script ${script.id}`,
                 description: dto.description,
             };
+        } else {
+            // Need to handle non-templated generic scripts if they exist?
+            // For now assume templated or implement standard flow if needed.
+             throw new InternalServerErrorException("Non-templated generic scripts not fully supported for generation yet.");
         }
-        // Case 2: Frontend explicit template override (Legacy/Manual)
-        else if (dto.templateId) {
-            endpoint = '/videos/fromTemplate';
-            payload = {
-                test: test,
-                templateId: dto.templateId,
-                templateData: dto.templateData || {},
-                title: dto.title || `Script ${scriptId}`,
-                description: dto.description,
-            };
-        }
-        // ...
-        // 3. Call API
-        this.logger.log(`Synthesia Payload [${endpoint}]: ${JSON.stringify(payload)}`);
+
+        this.logger.log(`Synthesia Payload (Generic) [${endpoint}]: ${JSON.stringify(payload)}`);
         const response = await this.fetchFromSynthesia(endpoint, {
             method: 'POST',
             body: JSON.stringify(payload),
-
         });
 
-        // Synthesia returns { id: "...", status: "..." }
         const externalId = response.id;
+        if (!externalId) throw new InternalServerErrorException('Failed to get video ID from Synthesia');
 
-        if (!externalId) {
-            throw new InternalServerErrorException('Failed to get video ID from Synthesia response');
-        }
-
-        this.logger.log(`Synthesia video generation started. External ID: ${externalId}`);
-
-        // 4. Create RenderedVideo record
         // @ts-ignore
         const renderedVideo = await this.prisma.renderedVideo.create({
             data: {
                 scriptId: script.id,
                 externalId: externalId,
-                status: 'PENDING', // Synthesia starts with created/queued
+                status: 'PENDING',
                 provider: 'SYNTHESIA',
                 requestPayload: payload,
             },
@@ -380,6 +365,74 @@ export class SynthesiaService {
             externalId: renderedVideo.externalId,
             status: renderedVideo.status,
             provider: 'SYNTHESIA'
+        };
+    }
+
+    private async generateLegacyScriptVideo(script: any, dto: CreateSynthesiaVideoDto) {
+        // Legacy logic (assumes From Scratch usually, or template override via DTO)
+        let endpoint = '/videos';
+        let payload: any = {};
+        const test = dto.test !== undefined ? dto.test : true;
+
+        if (dto.templateId) {
+            endpoint = '/videos/fromTemplate';
+            payload = {
+                test: test,
+                templateId: dto.templateId,
+                templateData: dto.templateData || {},
+                title: dto.title || `Script ${script.id}`,
+                description: dto.description,
+            };
+        } else {
+             // Create from scratch (standard for legacy scripts)
+             // Mapping legacy scenes to Synthesia input is complex if not done already.
+             // If this was working before, we need to know how it was constructing the body.
+             // Usually the frontend passed the full body for 'createFromScratch'.
+             // BUT here we are in 'generateVideo' which takes a scriptId.
+             // Logic in 'generateVideo' previously handled:
+             // "Case 2: Frontend explicit template override"
+             // AND ... wait, where was the "From Scratch" logic in the old generateVideo?
+             // It seems the old code ONLY supported Template Override in generateVideo? 
+             // "else if (dto.templateId) { ... }"
+             // It did NOT have a generic "From Scratch" block inside generateVideo.
+             
+             // If user clicks "Generate" on legacy script without templateId options, what happened?
+             // The old code had comments "// ..." and seemingly ended.
+             
+             // If we want to support legacy script generation from scratch, we need to convert scenes to Synthesia input.
+             // For now, let's assume legacy uses Template Override or we throw error if not supported.
+             
+             if (!dto.templateId) {
+                  throw new InternalServerErrorException("Legacy script generation requires a templateId (or direct creation flow).");
+             }
+        }
+
+        this.logger.log(`Synthesia Payload (Legacy) [${endpoint}]: ${JSON.stringify(payload)}`);
+        const response = await this.fetchFromSynthesia(endpoint, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+
+        const externalId = response.id;
+        if (!externalId) throw new InternalServerErrorException('Failed to get video ID from Synthesia');
+
+        // Save to SynthesiaRenderedVideo (Legacy Table)
+        // @ts-ignore
+        const renderedVideo = await this.prisma.synthesiaRenderedVideo.create({
+            data: {
+                scriptId: script.id,
+                synthesiaId: externalId,
+                status: 'pending',
+                downloadUrl: null
+            },
+        });
+
+        return {
+            message: 'Video generation started (Synthesia Legacy)',
+            videoId: renderedVideo.id,
+            externalId: renderedVideo.synthesiaId,
+            status: renderedVideo.status,
+            provider: 'SYNTHESIA_LEGACY'
         };
     }
 

@@ -43,9 +43,9 @@ model RenderedVideo {
   scriptId    String
   script      Script   @relation(fields: [scriptId], references: [id])
   status      String   // 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'
-  externalId  String?  // HeyGen ID
+  externalId  String?
   downloadUrl String?
-  provider    String   @default("HEYGEN") // 'HEYGEN' or 'SYNTHESIA'
+  provider    String   @default("SYNTHESIA") // 'HEYGEN' or 'SYNTHESIA'
   requestPayload Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -80,6 +80,8 @@ model SynthesiaVideoScript {
   sourceContentId String?
   sourceContent SourceContent? @relation(fields: [sourceContentId], references: [id])
   renderedVideos SynthesiaRenderedVideo[]
+  templateId String?
+  templateData Json?
 }
 
 model SynthesiaRenderedVideo {

@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { CreateCourseDto, UpdateScriptDto } from '@eduvideogen/shared-types';
-import { GroqService } from './groq.service';
+import { ScriptGeneratorService } from './script-generator.service';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '@eduvideogen/database';
 
 @Injectable()
 export class CoursesService {
     constructor(
-        private readonly groqService: GroqService,
+        private readonly scriptGeneratorService: ScriptGeneratorService,
         private readonly prisma: PrismaService,
     ) { }
 
@@ -22,7 +22,7 @@ export class CoursesService {
 
     async generateScript(dto: CreateCourseDto) {
         // 1. Generate Script using OpenAI
-        const scenes = await this.groqService.generateScript(dto.content);
+        const scenes = await this.scriptGeneratorService.generateScript(dto.content);
 
         // 2. Save to DB
         // Save Course

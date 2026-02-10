@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import { SavedScripts } from './components/SavedScripts';
 import { ScriptEditor } from './components/ScriptEditor';
 import { SmartScriptingPage } from './pages/SmartScriptingPage';
+import { TemplateScriptingPage } from './pages/TemplateScriptingPage';
 
 import { VideoFromScratchPage } from './pages/VideoFromScratchPage';
 import { GenerateScriptScreen } from './pages/GenerateScriptScreen';
@@ -31,8 +32,8 @@ function NavBar() {
                 </Link> */}
                 {/* <div className="h-full w-px bg-gray-200 mx-2"></div> */}
                 <Link
-                    to="/"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/')}`}
+                    to="/template-scripting"
+                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/template-scripting')}`}
                 >
                     Template Scripting
                 </Link>
@@ -89,6 +90,7 @@ function App() {
                 <main className="py-6">
                     <Routes>
                         <Route path="/" element={<SmartScriptingPage />} />
+                        <Route path="/template-scripting" element={<TemplateScriptingPage />} />
                         <Route path="/ai-scripts" element={<AiScriptsListScreen />} />
                         <Route path="/generate-script" element={<GenerateScriptScreen />} />
                         <Route path="/generate-script/:id" element={<GenerateScriptScreen />} />
