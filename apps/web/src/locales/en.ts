@@ -17,6 +17,10 @@ export const en = {
     "actions.check": "Check",
     "actions.view": "View",
     "actions.change_language": "Change Language",
+    "actions.regenerate": "Regenerate",
+    "actions.regenerating": "Regenerating...",
+    "actions.try_again": "Try Again",
+    "actions.apply_changes": "Apply Changes",
 
     // Loading states
     "loading.scripts": "Loading scripts...",
@@ -94,6 +98,18 @@ export const en = {
     // Script Editor Page
     "script_editor.page_title": "Script Edition",
     "script_editor.script_not_found": "Script not found",
+    "script_editor.scene": "Scene",
+    "script_editor.voice_script": "Voice Script",
+    "script_editor.voice_script_placeholder": "Enter script for this scene...",
+    "script_editor.no_content": "No editable content found for this script.",
+    "script_editor.template_name_label": "Synthesia Template Name",
+    "script_editor.regenerate_scene_title": "Regenerate Scene {{num}}",
+    "script_editor.regenerate_instruction_label":
+      "How would you like to improve this scene?",
+    "script_editor.regenerate_placeholder":
+      "e.g. Make it more enthusiastic, mention the final exam, simplify the explanation...",
+    "script_editor.regenerate_success":
+      "Success! Here is a preview of the changes:",
 
     // Confirmation Modal
     "modal.delete_script_title": "Delete Script",
@@ -123,6 +139,10 @@ export const en = {
     "video_status.failed": "failed",
     "video_status.pending": "pending",
     "video_status.processing": "in progress",
+
+    // Metadata Editor
+    "metadata.title": "Metadata",
+    "metadata.select_placeholder": "Select...",
 
     // Toast Messages
     "toast.script_created": "Script created successfully!",

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { SceneRegenerationModal } from "./SceneRegenerationModal";
 import { ScriptMetadataEditor, ScriptMetadata } from "./ScriptMetadataEditor";
 
@@ -25,6 +26,7 @@ export function FullScriptEditor({
   metadata,
   onMetadataChange,
 }: Props) {
+  const { t } = useTranslation();
   const [regenModal, setRegenModal] = useState<{
     isOpen: boolean;
     sceneNum: number | null;
@@ -54,10 +56,10 @@ export function FullScriptEditor({
     try {
       const newVars = await onRegenerateScene(regenModal.sceneNum, instruction);
       setRegenNewVariables(newVars);
-      toast.success(`Scene ${regenModal.sceneNum} regenerated!`);
+      toast.success(t("toast.status_updated"));
     } catch (error) {
       console.error(error);
-      toast.error("Failed to regenerate scene.");
+      toast.error(t("toast.failed_status_update"));
     } finally {
       setRegenLoading(false);
     }
@@ -117,7 +119,7 @@ export function FullScriptEditor({
       {templateName && (
         <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
           <span className="block text-xs font-bold text-blue-500 uppercase mb-1">
-            Synthesia Template Name
+            {t("script_editor.template_name_label")}
           </span>
           <p className="text-lg font-bold text-blue-900">{templateName}</p>
         </div>
@@ -136,7 +138,7 @@ export function FullScriptEditor({
         >
           <div className="flex justify-between items-center mb-4 border-b pb-2">
             <h3 className="text-lg font-bold text-green-800 uppercase">
-              Scene {num}
+              {t("script_editor.scene")} {num}
             </h3>
             {onRegenerateScene && (
               <button
@@ -157,7 +159,7 @@ export function FullScriptEditor({
                     d="M13 10V3L4 14h7v7l9-11h-7z"
                   />
                 </svg>
-                Regenerate
+                {t("actions.regenerate")}
               </button>
             )}
           </div>
@@ -186,7 +188,7 @@ export function FullScriptEditor({
             {scenes[num].voice && (
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Voice Script
+                  {t("script_editor.voice_script")}
                 </label>
                 <textarea
                   value={data[scenes[num].voice!]}
@@ -194,7 +196,7 @@ export function FullScriptEditor({
                     handleChange(scenes[num].voice!, e.target.value)
                   }
                   className="w-full border border-gray-300 rounded p-3 h-32 text-sm font-mono bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  placeholder="Enter script for this scene..."
+                  placeholder={t("script_editor.voice_script_placeholder")}
                 />
               </div>
             )}
@@ -204,7 +206,7 @@ export function FullScriptEditor({
 
       {globals.length === 0 && sortedSceneNums.length === 0 && (
         <div className="text-gray-500 italic p-4 text-center">
-          No editable content found for this script.
+          {t("script_editor.no_content")}
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export function SceneRegenerationModal({
   newVariables,
   onApply,
 }: Props) {
+  const { t } = useTranslation();
   const [instruction, setInstruction] = useState("");
 
   if (!isOpen) return null;
@@ -33,26 +35,26 @@ export function SceneRegenerationModal({
           ✕
         </button>
         <h2 className="text-xl font-bold mb-4 text-gray-800">
-          Regenerate Scene {sceneNumber}
+          {t("script_editor.regenerate_scene_title", { num: sceneNumber })}
         </h2>
 
         {!newVariables ? (
           <>
             <p className="text-sm text-gray-600 mb-4">
-              How would you like to improve this scene?
+              {t("script_editor.regenerate_instruction_label")}
             </p>
             <textarea
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
               className="w-full border border-gray-300 rounded-md p-3 h-32 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-4"
-              placeholder="e.g. Make it more enthusiastic, mention the final exam, simplify the explanation..."
+              placeholder={t("script_editor.regenerate_placeholder")}
             />
             <div className="flex justify-end gap-3">
               <button
                 onClick={onClose}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
               >
-                Cancel
+                {t("actions.cancel")}
               </button>
               <button
                 onClick={() => onConfirm(instruction)}
@@ -80,10 +82,10 @@ export function SceneRegenerationModal({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Regenerating...
+                    {t("actions.regenerating")}
                   </>
                 ) : (
-                  "Regenerate"
+                  t("actions.regenerate")
                 )}
               </button>
             </div>
@@ -92,7 +94,7 @@ export function SceneRegenerationModal({
           <>
             <div className="mb-4 bg-green-50 border border-green-200 rounded p-3">
               <p className="text-sm text-green-800 font-medium mb-2">
-                Success! Here is a preview of the changes:
+                {t("script_editor.regenerate_success")}
               </p>
               <div className="max-h-60 overflow-y-auto text-xs text-gray-600 space-y-2">
                 {Object.entries(newVariables).map(([key, value]) => (
@@ -108,13 +110,13 @@ export function SceneRegenerationModal({
                 onClick={() => onConfirm(instruction)} // Retry with same instruction
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
               >
-                Try Again
+                {t("actions.try_again")}
               </button>
               <button
                 onClick={onApply}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium"
               >
-                Apply Changes
+                {t("actions.apply_changes")}
               </button>
             </div>
           </>

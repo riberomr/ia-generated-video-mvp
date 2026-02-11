@@ -17,6 +17,10 @@ export const es = {
     "actions.check": "Verificar",
     "actions.view": "Ver",
     "actions.change_language": "Cambiar Idioma",
+    "actions.regenerate": "Regenerar",
+    "actions.regenerating": "Regenerando...",
+    "actions.try_again": "Reintentar",
+    "actions.apply_changes": "Aplicar Cambios",
 
     // Loading states
     "loading.scripts": "Cargando scripts...",
@@ -95,6 +99,21 @@ export const es = {
     // Script Editor Page
     "script_editor.page_title": "Edición de Script",
     "script_editor.script_not_found": "Script no encontrado",
+    "script_editor.scene": "Escena",
+    "script_editor.voice_script": "Guion de Voz",
+    "script_editor.voice_script_placeholder":
+      "Ingresa el guion para esta escena...",
+    "script_editor.no_content":
+      "No se encontró contenido editable para este script.",
+
+    "script_editor.template_name_label": "Nombre de Plantilla Synthesia",
+    "script_editor.regenerate_scene_title": "Regenerar Escena {{num}}",
+    "script_editor.regenerate_instruction_label":
+      "¿Cómo te gustaría mejorar esta escena?",
+    "script_editor.regenerate_placeholder":
+      "ej. Hazla más entusiasta, menciona el examen final, simplifica la explicación...",
+    "script_editor.regenerate_success":
+      "¡Éxito! Aquí tienes una vista previa de los cambios:",
 
     // Confirmation Modal
     "modal.delete_script_title": "Eliminar Script",
@@ -125,6 +144,10 @@ export const es = {
     "video_status.failed": "fallido",
     "video_status.pending": "pendiente",
     "video_status.processing": "en progreso",
+
+    // Metadata Editor
+    "metadata.title": "Metadatos",
+    "metadata.select_placeholder": "Seleccionar...",
 
     // Toast Messages
     "toast.script_created": "¡Script creado exitosamente!",
