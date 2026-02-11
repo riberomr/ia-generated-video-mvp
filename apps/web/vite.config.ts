@@ -8,7 +8,7 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
         alias: {
-            '@eduvideogen/shared-types': path.resolve(__dirname, '../../packages/shared-types/src/index.ts')
+            '@course-builder/shared-types': path.resolve(__dirname, '../../packages/shared-types/src/index.ts')
         }
     },
     server: {

@@ -1,5 +1,5 @@
 {
-    "name": "@eduvideogen/web",
+    "name": "@course-builder/web",
     "private": true,
     "version": "0.0.0",
     "type": "module",
@@ -10,7 +10,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@eduvideogen/shared-types": "*",
+        "@course-builder/shared-types": "*",
         "i18next": "^25.8.5",
         "i18next-browser-languagedetector": "^8.2.0",
         "react": "^19.2.3",

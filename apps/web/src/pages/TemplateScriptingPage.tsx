@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { TemplateSelector } from "../components/SmartScripting/TemplateSelector";
-import { SynthesiaTemplate } from "@eduvideogen/shared-types";
+import { SynthesiaTemplate } from "@course-builder/shared-types";
 import { useNavigate } from "react-router-dom";
 
 export const TemplateScriptingPage: React.FC = () => {

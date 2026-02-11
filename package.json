@@ -1,9 +1,9 @@
 {
-  "name": "eduvideogen",
+  "name": "course-builder",
   "private": true,
   "scripts": {
-    "build": "turbo run build --filter=@eduvideogen/*",
-    "dev": "turbo run dev --filter=@eduvideogen/*",
+    "build": "turbo run build --filter=@course-builder/*",
+    "dev": "turbo run dev --filter=@course-builder/*",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },

@@ -1,5 +1,5 @@
 {
-    "name": "@eduvideogen/shared-types",
+    "name": "@course-builder/shared-types",
     "version": "0.0.0",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",

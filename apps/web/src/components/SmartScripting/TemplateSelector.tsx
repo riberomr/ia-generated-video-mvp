@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { SynthesiaTemplate } from "@eduvideogen/shared-types";
+import { SynthesiaTemplate } from "@course-builder/shared-types";
 
 interface Props {
   source: string;
