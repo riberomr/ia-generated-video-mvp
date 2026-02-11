@@ -1,7 +1,7 @@
 export const es = {
   translation: {
     // Navigation
-    "nav.app_title": "VideoGen POC",
+    "nav.app_title": "Course Builder POC",
     "nav.saved_scripts": "Scripts Guardados",
     "nav.new_script": "Nuevo Script (Plantilla)",
 
@@ -65,6 +65,17 @@ export const es = {
     "template_scripting.summary": "Resumen",
     "template_scripting.template": "Plantilla:",
     "template_scripting.create_script": "Crear Script",
+
+    // Template Selector
+    "template_selector.filter_label": "Fuente:",
+    "template_selector.workspace": "Mi Workspace",
+    "template_selector.synthesia_examples": "Ejemplos Synthesia",
+    "template_selector.all": "Todas las Plantillas",
+    "template_selector.created_at": "Creado el",
+    "template_selector.updated_at": "Actualizado el",
+    "template_selector.scenes": "Escenas",
+    "template_selector.variables": "Variables",
+    "template_selector.no_description": "Sin descripción disponible",
 
     // Saved Scripts Page
     "saved_scripts.page_title": "Tus Scripts IA",

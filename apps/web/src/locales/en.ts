@@ -1,7 +1,7 @@
 export const en = {
   translation: {
     // Navigation
-    "nav.app_title": "VideoGen POC",
+    "nav.app_title": "Course Builder POC",
     "nav.saved_scripts": "Saved Scripts",
     "nav.new_script": "New Script (Template)",
 
@@ -64,6 +64,17 @@ export const en = {
     "template_scripting.summary": "Summary",
     "template_scripting.template": "Template:",
     "template_scripting.create_script": "Create Script",
+
+    // Template Selector
+    "template_selector.filter_label": "Source:",
+    "template_selector.workspace": "My Workspace",
+    "template_selector.synthesia_examples": "Synthesia Examples",
+    "template_selector.all": "All Templates",
+    "template_selector.created_at": "Created",
+    "template_selector.updated_at": "Updated",
+    "template_selector.scenes": "Scenes",
+    "template_selector.variables": "Variables",
+    "template_selector.no_description": "No description available",
 
     // Saved Scripts Page
     "saved_scripts.page_title": "Your AI Scripts",

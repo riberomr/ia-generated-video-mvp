@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Delete,
   Body,
+  Query,
 } from "@nestjs/common";
 import { Response } from "express";
 import { SynthesiaService } from "./synthesia.service";
@@ -16,8 +17,8 @@ export class VideosController {
   constructor(private readonly synthesiaService: SynthesiaService) {}
 
   @Get("templates")
-  async getSynthesiaTemplates() {
-    return this.synthesiaService.listTemplates();
+  async getSynthesiaTemplates(@Query("source") source?: string) {
+    return this.synthesiaService.listTemplates(source);
   }
 
   @Get("templates/:id")

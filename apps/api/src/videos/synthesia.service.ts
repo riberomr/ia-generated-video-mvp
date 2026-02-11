@@ -62,8 +62,12 @@ export class SynthesiaService {
     return data;
   }
 
-  async listTemplates() {
-    const response = await this.fetchFromSynthesia("/templates");
+  async listTemplates(source?: string) {
+    // Construir query params si source está presente
+    const queryParams = source ? `?source=${source}` : "";
+    const endpoint = `/templates${queryParams}`;
+
+    const response = await this.fetchFromSynthesia(endpoint);
     return response.templates || response || [];
   }
 
