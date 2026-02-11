@@ -1,110 +1,117 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-// import { ScriptGenerator } from './components/ScriptGenerator';
-import { SavedScripts } from './components/SavedScripts';
-import { ScriptEditor } from './components/ScriptEditor';
-import { SmartScriptingPage } from './pages/SmartScriptingPage';
-import { TemplateScriptingPage } from './pages/TemplateScriptingPage';
-
-import { VideoFromScratchPage } from './pages/VideoFromScratchPage';
-import { GenerateScriptScreen } from './pages/GenerateScriptScreen';
-import { SynthesiaScriptEditorPage } from './pages/SynthesiaScriptEditorPage';
-import { AiScriptsListScreen } from './pages/AiScriptsListScreen';
-import { AssetsPage } from './pages/AssetsPage';
-import { AvatarLibraryPage } from './pages/AvatarLibraryPage';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+} from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import { SavedScripts } from "./components/SavedScripts";
+import { TemplateScriptingPage } from "./pages/TemplateScriptingPage";
+import { ScriptEditor } from "./components/ScriptEditor";
 
 function NavBar() {
-    const location = useLocation();
+  const location = useLocation();
+  const { t, i18n } = useTranslation();
 
-    const isActive = (path: string) => {
-        return location.pathname === path
-            ? 'border-blue-600 text-blue-600'
-            : 'border-transparent text-gray-500 hover:text-gray-700';
-    };
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'es' : 'en';
+    i18n.changeLanguage(newLang);
+  };
 
-    return (
-        <nav className="bg-white shadow-sm border-b">
-            <div className="max-w-4xl mx-auto px-6 h-16 flex items-center space-x-8">
-                {/* <Link
-                    to="/"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/')}`}
-                >
-                    Generate Script
-                </Link> */}
-                {/* <div className="h-full w-px bg-gray-200 mx-2"></div> */}
-                <Link
-                    to="/template-scripting"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/template-scripting')}`}
-                >
-                    Template Scripting
-                </Link>
-                <Link
-                    to="/saved"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/saved')}`}
-                >
-                    Saved Scripts
-                </Link>
-                <div className="h-full w-px bg-gray-200 mx-2"></div>
-                <Link
-                    to="/generate-script"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/generate-script')}`}
-                >
-                    AI Script Generator
-                </Link>
-                <Link
-                    to="/ai-scripts"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/ai-scripts')}`}
-                >
-                    AI Scripts
-                </Link>
-                <Link
-                    to="/video-from-scratch"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/video-from-scratch')}`}
-                >
-                    Video From Scratch
-                </Link>
-                <div className="h-full w-px bg-gray-200 mx-2"></div>
-                <Link
-                    to="/assets"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/assets')}`}
-                >
-                    Assets
-                </Link>
-                <Link
-                    to="/avatars"
-                    className={`h-full flex items-center border-b-2 px-2 font-medium ${isActive('/avatars')}`}
-                >
-                    Avatars
-                </Link>
-                    
+  const isActive = (path: string) => {
+    return location.pathname === path
+      ? "border-indigo-600 text-indigo-600"
+      : "border-transparent text-gray-500 hover:text-gray-700";
+  };
 
+  return (
+    <nav className="bg-white shadow-sm border-b sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex">
+            <div className="flex-shrink-0 flex items-center">
+              <span className="font-bold text-xl text-indigo-600">
+                {t('nav.app_title')}
+              </span>
             </div>
-        </nav>
-    );
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              <Link
+                to="/"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive("/")}`}
+              >
+                {t('nav.saved_scripts')}
+              </Link>
+              <Link
+                to="/template-scripting"
+                className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive("/template-scripting")}`}
+              >
+                {t('nav.new_script')}
+              </Link>
+            </div>
+          </div>
+          <div className="flex items-center">
+            <button
+              onClick={toggleLanguage}
+              className="ml-4 px-3 py-1 text-sm font-medium text-gray-700 hover:text-indigo-600 border border-gray-300 rounded-md hover:border-indigo-600 transition-colors"
+              title={t("actions.change_language")}
+            >
+              {i18n.language === 'en' ? 'EN' : 'ES'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
 }
 
 function App() {
-    return (
-        <BrowserRouter>
-            <div className="min-h-screen bg-gray-100">
-                <NavBar />
-                <main className="py-6">
-                    <Routes>
-                        <Route path="/" element={<SmartScriptingPage />} />
-                        <Route path="/template-scripting" element={<TemplateScriptingPage />} />
-                        <Route path="/ai-scripts" element={<AiScriptsListScreen />} />
-                        <Route path="/generate-script" element={<GenerateScriptScreen />} />
-                        <Route path="/generate-script/:id" element={<GenerateScriptScreen />} />
-                        <Route path="/script-editor/:id" element={<SynthesiaScriptEditorPage />} />
-                        <Route path="/saved" element={<SavedScripts />} />
-                        <Route path="/video-from-scratch" element={<VideoFromScratchPage />} />
-                        <Route path="/editor/:id" element={<ScriptEditor />} />
-                        <Route path="/assets" element={<AssetsPage />} />
-                        <Route path="/avatars" element={<AvatarLibraryPage />} />
-                    </Routes>
-                </main>
-            </div>
-        </BrowserRouter>
-    );
+  return (
+    <BrowserRouter>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          success: {
+            style: {
+              background: "#dcfce7",
+              color: "#166534",
+              border: "1px solid #86efac",
+            },
+            iconTheme: {
+              primary: "#166534",
+              secondary: "#dcfce7",
+            },
+          },
+          error: {
+            style: {
+              background: "#fee2e2",
+              color: "#991b1b",
+              border: "1px solid #fca5a5",
+            },
+            iconTheme: {
+              primary: "#991b1b",
+              secondary: "#fee2e2",
+            },
+          },
+        }}
+      />
+      <div className="min-h-screen bg-gray-50">
+        <NavBar />
+
+        <main className="py-10">
+          <Routes>
+            <Route path="/" element={<SavedScripts />} />
+            <Route
+              path="/template-scripting"
+              element={<TemplateScriptingPage />}
+            />
+            <Route path="/editor/:id" element={<ScriptEditor />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
 }
 
 export default App;

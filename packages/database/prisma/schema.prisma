@@ -1,6 +1,7 @@
+// schema.prisma (en tu nueva rama)
+
 generator client {
   provider = "prisma-client-js"
-  output   = "../../../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -8,124 +9,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ScriptStatus {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
+model AiScript {
+  id                String   @id @default(uuid())
+  title             String
+  
+  // Datos del Curso y Docente
+  courseName        String
+  teacherName       String
+  teacherRole       String   // Cargo
+  teacherSpecialty  String   // Especialidad
+  
+  // Contexto Pedagógico y Estilo
+  studentProfile    String   // Perfil del Estudiante
+  videoType         String   // Tipo de video
+  tone              String   // Ej: formal, cercano
+  style             String   // Estilo visual
+  
+  // Synthesia Integration
+  templateId        String   
+  templateName      String?  // Nombre del template de Synthesia
+  templateData      Json     // JSONB para variables dinámicas
+  rawTemplateVariables Json? // Variables "crudas" del template para referencia futura
+  sourceContent     String?  @db.Text // Contenido extraído de los archivos PDF/DOCX
+  isDeleted         Boolean  @default(false)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  videos            VideoRender[]
 }
 
-model Course {
-  id        String   @id @default(uuid())
-  topic     String
-  rawContent String  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  scripts   Script[]
-}
+model VideoRender {
+  id              String      @id @default(uuid())
+  externalId      String?     @unique // ID de Synthesia
+  status          String      @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  
+  scriptId        String
+  script          AiScript    @relation(fields: [scriptId], references: [id])
 
-model Script {
-  id        String   @id @default(uuid())
-  courseId  String
-  course    Course   @relation(fields: [courseId], references: [id])
-  scenes    Json
-  status    ScriptStatus @default(DRAFT)
-  originalScenes Json
-  isTemplated Boolean @default(false)
-  templateId String?
-  templateData Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  videos    RenderedVideo[]
-}
-
-model RenderedVideo {
-  id          String   @id @default(uuid())
-  scriptId    String
-  script      Script   @relation(fields: [scriptId], references: [id])
-  status      String   // 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'
-  externalId  String?
-  downloadUrl String?
-  provider    String   @default("SYNTHESIA") // 'HEYGEN' or 'SYNTHESIA'
-  requestPayload Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model SynthesiaAvatar {
-  id        String   @id // provider ID (e.g. "49dc8f46...")
-  name      String
-  gender    String
-  version   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model SynthesiaVoice {
-  id           String   @id // provider ID
-  name         String   // e.g. "Natural", "Original"
-  gender       String
-  language     String   // e.g. "English (US)"
-  languageCode String   // e.g. "en-US"
-  nativeName   String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
-model SynthesiaVideoScript {
-  id        String   @id @default(uuid())
-  title     String
-  scenes    Json     // Array of SceneConfig
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  sourceContentId String?
-  sourceContent SourceContent? @relation(fields: [sourceContentId], references: [id])
-  renderedVideos SynthesiaRenderedVideo[]
-  templateId String?
-  templateData Json?
-}
-
-model SynthesiaRenderedVideo {
-  id          String   @id @default(uuid())
-  synthesiaId String
-  status      String   // e.g., 'processing', 'completed', 'failed'
-  downloadUrl String?
-  createdAt   DateTime @default(now())
-  scriptId    String?
-  script      SynthesiaVideoScript? @relation(fields: [scriptId], references: [id])
-}
-
-model SourceContent {
-  id        String   @id @default(uuid())
-  title     String?
-  content   String   @db.Text
-  createdAt DateTime @default(now())
-  scripts   SynthesiaVideoScript[]
-}
-
-enum SynthesiaAssetType {
-  IMAGE
-  VIDEO
-  AUDIO
-}
-
-model SynthesiaAsset {
-  id             String             @id @default(uuid())
-  originalName   String
-  mimeType       String
-  minioObjectKey String
-  synthesiaId    String
-  title          String?
-  type           SynthesiaAssetType
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-}
-
-model SynthesiaScrappedAvatar {
-  id        String   @id
-  name      String
-  gender    String?
-  imageUrl  String
-  metadata  Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDeleted       Boolean     @default(false)
+  
+  // No guardamos URL fija, se pedirá a la API vía externalId
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }

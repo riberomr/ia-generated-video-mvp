@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres-poc: # Nombre de servicio distinto
+    image: postgres:15-alpine
+    container_name: course-builder-db-poc
+    ports:
+      - "5433:5432" # Puerto 5433 en tu PC mapea al 5432 interno
+    environment:
+      POSTGRES_USER: user_poc
+      POSTGRES_PASSWORD: password_poc
+      POSTGRES_DB: course_builder_poc
+    volumes:
+      - postgres_data_poc:/var/lib/postgresql/data
+
+  redis-poc:
+    image: redis:7-alpine
+    container_name: course-builder-redis-poc
+    ports:
+      - "6380:6379"
+
+volumes:
+  postgres_data_poc: # Volumen aislado

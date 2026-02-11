@@ -1,215 +1,218 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import { FullScriptEditor } from "./SmartScripting/FullScriptEditor";
 
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { Scene, UpdateScriptDto, Script } from '@eduvideogen/shared-types';
-import { FullScriptEditor } from './SmartScripting/FullScriptEditor';
+import { ScriptMetadata } from "./SmartScripting/ScriptMetadataEditor";
 
-interface ScriptEditorForm {
-    scenes: Scene[];
+interface AiScript {
+  id: string;
+  title: string;
+  courseName?: string;
+  teacherName?: string;
+  teacherRole?: string;
+  teacherSpecialty?: string;
+  studentProfile?: string;
+  videoType?: string;
+  tone?: string;
+  style?: string;
+  templateData: any;
+  templateId?: string;
 }
 
 export function ScriptEditor() {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [script, setScript] = useState<Script | null>(null);
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [script, setScript] = useState<AiScript | null>(null);
+  const [templateData, setTemplateData] = useState<Record<string, string>>({});
+  const [templateName, setTemplateName] = useState<string>("");
+  const [metadata, setMetadata] = useState<ScriptMetadata>({
+    title: "",
+    courseName: "",
+    teacherName: "",
+    teacherRole: "",
+    teacherSpecialty: "",
+    studentProfile: "",
+    videoType: "",
+    tone: "",
+    style: "",
+  });
 
-    // Legacy Form
-    const { control, register, handleSubmit, reset } = useForm<ScriptEditorForm>({
-        defaultValues: {
-            scenes: []
-        }
-    });
+  useEffect(() => {
+    if (!id) return;
 
-    const { fields } = useFieldArray({
-        control,
-        name: "scenes"
-    });
-
-    // Smart Script State
-    const [smartTemplateData, setSmartTemplateData] = useState<Record<string, string>>({});
-
-    useEffect(() => {
-        if (!id) return;
-
-        const fetchScript = async () => {
-            try {
-                const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/courses/scripts/${id}`);
-                if (!response.ok) throw new Error('Failed to load script');
-                const data: Script = await response.json();
-                setScript(data);
-
-                if (data.isTemplated) {
-                    // Load templateData directly.
-                    setSmartTemplateData((data.templateData as Record<string, string>) || {});
-                } else {
-                    reset({ scenes: data.scenes as Scene[] });
-                }
-            } catch (error) {
-                console.error(error);
-                alert('Error loading script');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchScript();
-    }, [id, reset]);
-console.log(script, 'smartTemplateData')
-    const handleLegacySubmit = async (data: ScriptEditorForm) => {
-        if (!id) return;
-        setSaving(true);
-        try {
-            const updateDto: UpdateScriptDto = {
-                scenes: data.scenes
-            };
-
-            await saveScript(updateDto);
-        } catch (error) {
-            console.error(error);
-            alert('Error saving script');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleSmartSave = async () => {
-        if (!id) return;
-        setSaving(true);
-        try {
-            // We just send the unified templateData.
-            // We also reconstruct 'scenes' array for the backend schema requirement (Optional but good practice if logic depends on it)
-            // But main data is templateData.
-
-            const sceneKeys = Object.keys(smartTemplateData)
-                .filter(key => key.startsWith('script_voice_text_'))
-                .sort((a, b) => {
-                    const numA = parseInt(a.replace('script_voice_text_', ''), 10);
-                    const numB = parseInt(b.replace('script_voice_text_', ''), 10);
-                    return numA - numB;
-                });
-            const scenes = sceneKeys.map(key => smartTemplateData[key]);
-
-            const updateDto: any = {
-                isTemplated: true,
-                templateData: smartTemplateData,
-                scenes: scenes
-            };
-
-            await saveScript(updateDto);
-        } catch (error) {
-            console.error(error);
-            alert('Error saving smart script');
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    const saveScript = async (dto: any) => {
-        const response = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/courses/scripts/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dto)
+    const fetchScript = async () => {
+      try {
+        // New Endpoint
+        const response = await fetch(
+          `${import.meta.env.VITE_APP_BASE_URL}/ai-scripts/${id}`,
+        );
+        if (!response.ok) throw new Error("Failed to load script");
+        const data: AiScript = await response.json();
+        setScript(data);
+        setMetadata({
+          title: data.title || "",
+          courseName: data.courseName || "",
+          teacherName: data.teacherName || "",
+          teacherRole: data.teacherRole || "",
+          teacherSpecialty: data.teacherSpecialty || "",
+          studentProfile: data.studentProfile || "",
+          videoType: data.videoType || "",
+          tone: data.tone || "",
+          style: data.style || "",
         });
 
-        if (!response.ok) throw new Error('Failed to save script');
+        if (data.templateId) {
+          try {
+            const tmplRes = await fetch(
+              `${import.meta.env.VITE_APP_BASE_URL}/videos/templates/${data.templateId}`,
+            );
+            if (tmplRes.ok) {
+              const tmplData = await tmplRes.json();
+              setTemplateName(tmplData.title);
+            }
+          } catch (err) {
+            console.error("Failed to fetch template name", err);
+          }
+        }
 
-        alert('Script updated successfully!');
-        navigate('/saved');
+        if (data.templateData) {
+          // Start with what's in DB.
+          // If templateData is complex, FullScriptEditor might need generic JSON handling
+          // or flattening. Assuming flat or handled by FullScriptEditor.
+          // Synthesia template data is usually { "variable_name": "value" }
+          // If it is nested in "variables", we extract it.
+          const vars =
+            (data.templateData as any).variables || data.templateData;
+          setTemplateData(vars || {});
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error(t('toast.failed_load_script'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchScript();
+  }, [id, t]);
+
+  const handleSave = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      // Update the script with new templateData
+      // We preserve the structure "variables": { ... } if that's what we received,
+      // or just save the flat object if that's how we model it.
+      // Let's assume we save it as the 'templateData' field directly.
+
+      const payload = {
+        templateData: templateData,
+        ...metadata,
+      };
+
+      const response = await fetch(
+        `${import.meta.env.VITE_APP_BASE_URL}/ai-scripts/${id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!response.ok) throw new Error("Failed to save script");
+
+      toast.success(t('toast.script_updated'));
+      navigate("/"); // Go back to saved scripts
+    } catch (error) {
+      console.error(error);
+      toast.error(t('toast.failed_save_script'));
+    } finally {
+      setSaving(false);
     }
+  };
 
-    if (loading) return <div className="p-8 text-center">Loading script...</div>;
+  const handleRegenerateScene = async (
+    sceneNum: number,
+    instruction: string,
+  ): Promise<Record<string, string>> => {
+    if (!id || !script) throw new Error("No script context");
 
-    console.log(smartTemplateData);
-    if (script?.isTemplated) {
-        return (
-            <div className="max-w-4xl mx-auto p-6">
-                <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl font-bold">Edit Smart Script</h1>
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => navigate('/saved')}
-                            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSmartSave}
-                            disabled={saving}
-                            className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
-                        >
-                            {saving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                    </div>
-                </div>
-
-                <FullScriptEditor
-                    data={smartTemplateData}
-                    onChange={(newData) => setSmartTemplateData(newData)}
-                    title={(script as any).course?.topic || 'Smart Script'}
-                />
-
-
-            </div>
-        )
-    }
-
-    return (
-        <div className="max-w-4xl mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-8">Edit Script</h1>
-            <form onSubmit={handleSubmit(handleLegacySubmit)} className="space-y-6">
-                {fields.map((field, index) => (
-                    <div key={field.id} className="bg-white p-4 rounded shadow-sm border border-gray-200">
-                        <div className="flex justify-between mb-2">
-                            <span className="font-bold text-gray-700">Scene {index + 1}</span>
-                            <span className="text-gray-500 text-sm">
-                                <input
-                                    type="number"
-                                    {...register(`scenes.${index}.estimated_duration`, { valueAsNumber: true })}
-                                    className="w-16 p-1 border rounded text-right"
-                                /> s
-                            </span>
-                        </div>
-
-                        <div className="mb-4">
-                            <label className="block text-sm font-semibold text-blue-600 mb-1">Visual Description</label>
-                            <textarea
-                                {...register(`scenes.${index}.visual_description`)}
-                                className="w-full p-2 border rounded"
-                                rows={2}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-semibold text-green-600 mb-1">Audio Text</label>
-                            <textarea
-                                {...register(`scenes.${index}.text`)}
-                                className="w-full p-2 border rounded"
-                                rows={3}
-                            />
-                        </div>
-                    </div>
-                ))}
-
-                <div className="flex justify-end gap-4">
-                    <button
-                        type="button"
-                        onClick={() => navigate('/saved')}
-                        className="px-6 py-2 border rounded text-gray-600 hover:bg-gray-50"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
-                    >
-                        {saving ? 'Publishing...' : 'Save & Publish'}
-                    </button>
-                </div>
-            </form>
-        </div>
+    const response = await fetch(
+      `${import.meta.env.VITE_APP_BASE_URL}/ai-scripts/${id}/regenerate-scene`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sceneNumber: sceneNum,
+          currentScript: {
+            ...script,
+            templateData: templateData,
+          },
+          userInstruction: instruction,
+        }),
+      },
     );
+
+    if (!response.ok) {
+      throw new Error("Failed to regenerate scene");
+    }
+
+    const newVariables = await response.json();
+    return newVariables;
+  };
+
+  if (loading)
+    return (
+      <div className="p-8 text-center text-gray-500">{t('loading.script')}</div>
+    );
+
+  if (!script)
+    return <div className="p-8 text-center text-red-500">{t('script_editor.script_not_found')}</div>;
+
+  return (
+    <div className="max-w-7xl mx-auto p-6">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {t('script_editor.page_title')}
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate("/")}
+            className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm hover:bg-gray-50"
+          >
+            {t('actions.back')}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-indigo-600 text-white px-6 py-2 rounded shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? t('actions.saving') : t('actions.save')}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg p-6 border border-gray-200">
+        <FullScriptEditor
+          data={templateData}
+          onChange={(newData) => setTemplateData(newData)}
+          title={script.title}
+          templateName={templateName}
+          onRegenerateScene={handleRegenerateScene}
+          metadata={metadata}
+          onMetadataChange={(key, value) =>
+            setMetadata({ ...metadata, [key]: value })
+          }
+        />
+      </div>
+    </div>
+  );
 }

@@ -25,6 +25,7 @@
         "dotenv": "^17.2.3",
         "fast-safe-stringify": "^2.1.1",
         "openai": "^4.0.0",
+        "pdf-parse": "1.1.1",
         "reflect-metadata": "^0.1.13",
         "rxjs": "^7.8.1",
         "vite": "7.3.1"
