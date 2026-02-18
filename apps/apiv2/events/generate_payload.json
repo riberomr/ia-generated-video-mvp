@@ -1,0 +1,5 @@
+{
+  "httpMethod": "POST",
+  "path": "/ai-scripts/generate-from-files",
+  "body": "{\"title\":\"Test Script Bedrock\",\"courseName\":\"Advanced AWS\",\"teacherName\":\"Martin\",\"teacherRole\":\"Architect\",\"teacherSpecialty\":\"Cloud\",\"studentProfile\":\"Developers\",\"videoType\":\"Course Welcome\",\"tone\":\"Professional\",\"style\":\"Concise\",\"templateId\":\"test-template-id\",\"provider\":\"bedrock\",\"files\":[]}"
+}

@@ -10,10 +10,12 @@ import { useTranslation } from "react-i18next";
 import { SavedScripts } from "./components/SavedScripts";
 import { TemplateScriptingPage } from "./pages/TemplateScriptingPage";
 import { ScriptEditor } from "./components/ScriptEditor";
+import { SettingsProvider, useSettings } from "./context/SettingsContext";
 
 function NavBar() {
   const location = useLocation();
   const { t, i18n } = useTranslation();
+  const { aiProvider, setAiProvider } = useSettings();
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'es' : 'en';
@@ -47,14 +49,27 @@ function NavBar() {
                 to="/template-scripting"
                 className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${isActive("/template-scripting")}`}
               >
-                {t('nav.new_script')}
+              {t('nav.new_script')}
               </Link>
             </div>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
+            {/* AI Provider Selector */}
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-medium text-gray-500 hidden sm:inline">AI Model:</span>
+              <select
+                value={aiProvider}
+                onChange={(e) => setAiProvider(e.target.value as 'groq' | 'bedrock')}
+                className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-1 pl-2 pr-8 bg-gray-50"
+              >
+                <option value="groq">Groq (Llama 3)</option>
+                <option value="bedrock">Bedrock (Claude 3.5)</option>
+              </select>
+            </div>
+
             <button
               onClick={toggleLanguage}
-              className="ml-4 px-3 py-1 text-sm font-medium text-gray-700 hover:text-indigo-600 border border-gray-300 rounded-md hover:border-indigo-600 transition-colors"
+              className="px-3 py-1 text-sm font-medium text-gray-700 hover:text-indigo-600 border border-gray-300 rounded-md hover:border-indigo-600 transition-colors"
               title={t("actions.change_language")}
             >
               {i18n.language === 'en' ? 'EN' : 'ES'}
@@ -68,49 +83,51 @@ function NavBar() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          success: {
-            style: {
-              background: "#dcfce7",
-              color: "#166534",
-              border: "1px solid #86efac",
+    <SettingsProvider>
+      <BrowserRouter>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            success: {
+              style: {
+                background: "#dcfce7",
+                color: "#166534",
+                border: "1px solid #86efac",
+              },
+              iconTheme: {
+                primary: "#166534",
+                secondary: "#dcfce7",
+              },
             },
-            iconTheme: {
-              primary: "#166534",
-              secondary: "#dcfce7",
+            error: {
+              style: {
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+              },
+              iconTheme: {
+                primary: "#991b1b",
+                secondary: "#fee2e2",
+              },
             },
-          },
-          error: {
-            style: {
-              background: "#fee2e2",
-              color: "#991b1b",
-              border: "1px solid #fca5a5",
-            },
-            iconTheme: {
-              primary: "#991b1b",
-              secondary: "#fee2e2",
-            },
-          },
-        }}
-      />
-      <div className="min-h-screen bg-gray-50">
-        <NavBar />
+          }}
+        />
+        <div className="min-h-screen bg-gray-50">
+          <NavBar />
 
-        <main className="py-10">
-          <Routes>
-            <Route path="/" element={<SavedScripts />} />
-            <Route
-              path="/template-scripting"
-              element={<TemplateScriptingPage />}
-            />
-            <Route path="/editor/:id" element={<ScriptEditor />} />
-          </Routes>
-        </main>
-      </div>
-    </BrowserRouter>
+          <main className="py-10">
+            <Routes>
+              <Route path="/" element={<SavedScripts />} />
+              <Route
+                path="/template-scripting"
+                element={<TemplateScriptingPage />}
+              />
+              <Route path="/editor/:id" element={<ScriptEditor />} />
+            </Routes>
+          </main>
+        </div>
+      </BrowserRouter>
+    </SettingsProvider>
   );
 }
 

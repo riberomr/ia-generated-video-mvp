@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import { TemplateSelector } from "../components/SmartScripting/TemplateSelector";
 import { SynthesiaTemplate } from "@course-builder/shared-types";
 import { useNavigate } from "react-router-dom";
+import { useSettings } from "../context/SettingsContext";
 
 export const TemplateScriptingPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { aiProvider } = useSettings();
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedTemplate, setSelectedTemplate] =
     useState<SynthesiaTemplate | null>(null);
@@ -128,6 +130,7 @@ export const TemplateScriptingPage: React.FC = () => {
       "title",
       formData.title || formData.courseName || "Untitled Course Video",
     );
+    apiFormData.append("provider", aiProvider);
 
     try {
       // Updated endpoint: POST /ai-scripts/generate-from-files
@@ -142,17 +145,61 @@ export const TemplateScriptingPage: React.FC = () => {
       if (!res.ok) throw new Error("Failed to create script");
 
       const data = await res.json();
+      
+      // Handle Async Polling
+      if (res.status === 202 || data.status === "PENDING" || data.status === "PROCESSING") {
+        const scriptId = data.id;
+        toast.success(t("toast.script_generation_started"), { duration: 4000 });
+        
+        // Poll every 3 seconds
+        const pollInterval = setInterval(async () => {
+             try {
+                 const pollRes = await fetch(`${import.meta.env.VITE_APP_BASE_URL}/ai-scripts/${scriptId}`);
+                 if (pollRes.ok) {
+                     const pollData = await pollRes.json();
+                     if (pollData.status === "COMPLETED") {
+                         clearInterval(pollInterval);
+                         setLoading(false);
+                         toast.success(t("toast.script_created"));
+                         navigate(`/editor/${scriptId}`);
+                     } else if (pollData.status === "FAILED") {
+                         clearInterval(pollInterval);
+                         setLoading(false);
+                         setError("Script generation failed on server.");
+                         toast.error("Script generation failed.");
+                     }
+                     // If PENDING/PROCESSING, continue polling
+                 }
+             } catch (e) {
+                 console.error("Polling error", e);
+                 // Don't stop polling on transient network errors? Or maybe stop after N retries.
+                 // For MVP, we continue or let user cancel by leaving page.
+             }
+        }, 3000);
+        
+        // Safety timeout: Stop polling after 5 minutes
+        setTimeout(() => {
+            clearInterval(pollInterval);
+            if (loading) {
+                setLoading(false);
+                setError("Operation timed out. Please check 'Saved Scripts' later.");
+            }
+        }, 300000);
 
-      toast.success(t("toast.script_created"));
-      navigate(`/editor/${data.id}`);
+      } else {
+        // Fallback for sync response (if any)
+        navigate(`/editor/${data.id}`);
+        setLoading(false);
+      }
+
     } catch (err: any) {
       console.error(err);
       const msg = err.message || t("toast.error_generating_script");
       setError(msg);
       toast.error(msg);
-    } finally {
       setLoading(false);
-    }
+    } 
+    // Finally block removed because we might be polling
   };
 
   return (

@@ -2,6 +2,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -12,6 +13,7 @@ datasource db {
 model AiScript {
   id                String   @id @default(uuid())
   title             String
+  status            String   @default("COMPLETED") // PENDING, PROCESSING, COMPLETED, FAILED
   
   // Datos del Curso y Docente
   courseName        String

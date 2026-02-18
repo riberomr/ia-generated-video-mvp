@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Course Builder API v2 - Serverless Lambdas
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 120
+    MemorySize: 512
+    Environment:
+      Variables:
+        DATABASE_URL: !Ref DatabaseUrl
+        GROQ_API_KEY: !Ref GroqApiKey
+        SYNTHESIA_API_KEY: !Ref SynthesiaApiKey
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    Description: PostgreSQL connection string
+    NoEcho: true
+  GroqApiKey:
+    Type: String
+    Description: Groq API key for LLM calls
+    NoEcho: true
+  SynthesiaApiKey:
+    Type: String
+    Description: Synthesia API key for video generation
+    NoEcho: true
+
+Resources:
+  # ── API Gateway ────────────────────────────────────────────────────────────
+  CourseBuilderApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowMethods: "'GET,POST,PATCH,DELETE,OPTIONS'"
+      BinaryMediaTypes:
+        - "multipart/form-data"
+
+  # ── Lambda 1: AI Scripts API ──────────────────────────────────────────────
+  AiScriptsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: course-builder-ai-scripts
+      Handler: dist/ai-scripts.handler
+      CodeUri: .
+      Description: AI Scripts CRUD and async trigger
+      Timeout: 29
+      MemorySize: 1024
+      Environment:
+        Variables:
+          WORKER_FUNCTION_NAME: !Ref AiScriptsWorkerFunction
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AiScriptsWorkerFunction
+      Events:
+        CreateScript:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /ai-scripts
+            Method: POST
+        GenerateFromFiles:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /ai-scripts/generate-from-files
+            Method: POST
+        RegenerateScene:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /ai-scripts/{id}/regenerate-scene
+            Method: POST
+        ListScripts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /ai-scripts
+            Method: GET
+        GetScript:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /ai-scripts/{id}
+            Method: GET
+        UpdateScript:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /ai-scripts/{id}
+            Method: PATCH
+        DeleteScript:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /ai-scripts/{id}
+            Method: DELETE
+
+  # ── Lambda 2: AI Scripts Worker ───────────────────────────────────────────
+  AiScriptsWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: course-builder-ai-scripts-worker
+      Handler: dist/ai-scripts.worker
+      CodeUri: .
+      Description: Background worker for AI generation (Bedrock/Groq)
+      Timeout: 900
+      MemorySize: 2048
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: "*"
+
+  # ── Lambda 3: Videos ──────────────────────────────────────────────────────
+  VideosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: course-builder-videos
+      Handler: dist/videos.handler
+      CodeUri: .
+      Description: Video generation, status check, download URL, and deletion
+      Timeout: 120
+      MemorySize: 512
+      Events:
+        GenerateVideo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /videos/generate/{scriptId}
+            Method: POST
+        CheckStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /videos/status/{videoId}
+            Method: GET
+        DownloadUrl:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /videos/{videoId}/download-url
+            Method: GET
+        DeleteVideo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /videos/{videoId}
+            Method: DELETE
+
+  # ── Lambda 4: Templates ───────────────────────────────────────────────────
+  TemplatesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: course-builder-templates
+      Handler: dist/templates.handler
+      CodeUri: .
+      Description: Synthesia template listing and detail retrieval
+      Timeout: 30
+      MemorySize: 256
+      Events:
+        ListTemplates:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /videos/templates
+            Method: GET
+        GetTemplate:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CourseBuilderApi
+            Path: /videos/templates/{id}
+            Method: GET
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${CourseBuilderApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  AiScriptsFunctionArn:
+    Description: AI Scripts Lambda ARN
+    Value: !GetAtt AiScriptsFunction.Arn
+  AiScriptsWorkerFunctionArn:
+    Description: AI Scripts Worker Lambda ARN
+    Value: !GetAtt AiScriptsWorkerFunction.Arn
+  VideosFunctionArn:
+    Description: Videos Lambda ARN
+    Value: !GetAtt VideosFunction.Arn
+  TemplatesFunctionArn:
+    Description: Templates Lambda ARN
+    Value: !GetAtt TemplatesFunction.Arn

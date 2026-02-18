@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { useSettings } from "../context/SettingsContext"; // Import context
 import { FullScriptEditor } from "./SmartScripting/FullScriptEditor";
 
 import { ScriptMetadata } from "./SmartScripting/ScriptMetadataEditor";
@@ -25,6 +26,7 @@ export function ScriptEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { aiProvider } = useSettings(); // Use context
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [script, setScript] = useState<AiScript | null>(null);
@@ -182,9 +184,52 @@ export function ScriptEditor() {
             },
           },
           userInstruction: instruction,
+          provider: aiProvider, // Include provider
         }),
       },
     );
+
+    if (response.status === 202) {
+      // Async Poll
+      return new Promise((resolve, reject) => {
+        const pollInterval = setInterval(async () => {
+          try {
+            const pollRes = await fetch(
+              `${import.meta.env.VITE_APP_BASE_URL}/ai-scripts/${id}`,
+            );
+            if (pollRes.ok) {
+              const pollData = await pollRes.json();
+              if (pollData.status === "COMPLETED") {
+                clearInterval(pollInterval);
+                
+                // Extract new variables for the specific scene
+                const newData = pollData.templateData?.data || {};
+                const sceneVars: Record<string, string> = {};
+                
+                Object.keys(newData).forEach(key => {
+                   if (key.endsWith(`_scene_${sceneNum}`) || key === `script_voice_text_${sceneNum}`) {
+                       sceneVars[key] = newData[key];
+                   }
+                });
+                
+                resolve(sceneVars);
+              } else if (pollData.status === "FAILED") {
+                clearInterval(pollInterval);
+                reject(new Error("Scene regeneration failed."));
+              }
+            }
+          } catch (e) {
+            console.error("Polling error", e);
+          }
+        }, 2000);
+
+        // Timeout 2 minutes
+        setTimeout(() => {
+            clearInterval(pollInterval);
+            reject(new Error("Timeout waiting for regeneration"));
+        }, 120000);
+      });
+    }
 
     if (!response.ok) {
       throw new Error("Failed to regenerate scene");
