@@ -214,8 +214,9 @@ export const regenerateSceneSystemPrompt = (
 
         # REGLAS DE RESPUESTA (CRÍTICO)
         1. **Solo JSON Puro**: Tu salida debe ser UNICAMENTE un objeto JSON válido. Nada de texto antes ni después.
-        2. **Estructura Estricta**: El JSON debe contener EXACTAMENTE las mismas claves que se te proporcionen en la "Escena Actual", pero con los valores actualizados.
-        3. **Coherencia**: El nuevo contenido debe fluir naturalmente desde la escena anterior y conectar con la siguiente (si se proporcionan).
+        2. **Estructura Estricta**: El JSON debe contener EXACTAMENTE las mismas claves que se te proporcionen en la "Escena Actual". NO agregues claves de otras escenas. SI agregas claves extras, el sistema fallará.
+        3. **Alcance Limitado**: Solo modifica el contenido de las claves proporcionadas. No alucines contenido fuera de esta escena.
+        4. **Coherencia**: El nuevo contenido debe fluir naturalmente desde la escena anterior y conectar con la siguiente (si se proporcionan).
 `;
 
 export const regenerateSceneUserPrompt = (

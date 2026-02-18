@@ -4,6 +4,7 @@ import { AiScript, Prisma } from "@prisma/client";
 import { FileExtractionService } from "../videos/file-extraction.service";
 import { SynthesiaService } from "../videos/synthesia.service";
 import { GroqService } from "./groq.service";
+import { BedrockService } from "./bedrock.service";
 import * as Prompts from "./prompts";
 
 @Injectable()
@@ -15,6 +16,7 @@ export class AiScriptsService {
     private fileExtractionService: FileExtractionService,
     private synthesiaService: SynthesiaService,
     private groqService: GroqService,
+    private bedrockService: BedrockService,
   ) {}
 
   async create(data: Prisma.AiScriptCreateInput): Promise<AiScript> {
@@ -75,6 +77,7 @@ export class AiScriptsService {
       tone,
       style,
       templateId,
+      provider,
     } = metadata;
 
     let scenePurposes: Record<string, string> = {};
@@ -176,10 +179,7 @@ export class AiScriptsService {
         );
 
         // Prepare prompts
-        const truncatedSource =
-          sourceContent.length > 25000
-            ? sourceContent.substring(0, 25000) + "...(truncated)"
-            : sourceContent;
+        const truncatedSource = sourceContent;
 
         // Convert rawTemplateVariables to the JSON structure expected by the prompt
         // The prompt expects a JSON where keys are the labels/ids to be filled
@@ -214,14 +214,27 @@ export class AiScriptsService {
           truncatedSource,
         );
 
-        const completion = await this.groqService.checkCompletion({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          model: "llama-3.3-70b-versatile",
-          jsonMode: true,
-        });
+        let completion;
+        
+        if (provider === "bedrock") {
+           completion = await this.bedrockService.checkCompletion({
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            model: "us.anthropic.claude-3-5-sonnet-20240620-v1:0", // Explicitly using 3.5 Sonnet (US Cross-region)
+            jsonMode: true,
+          });
+        } else {
+           completion = await this.groqService.checkCompletion({
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            model: "llama-3.3-70b-versatile",
+            jsonMode: true,
+          });
+        }
 
         const responseContent = completion.choices[0].message.content;
         if (responseContent) {
@@ -305,6 +318,7 @@ export class AiScriptsService {
     sceneNumber: number,
     currentScript: any,
     userInstruction: string,
+    provider: string = "groq", // Default to groq if not specified
   ) {
     // 1. Fetch original script to get metadata and context
     const script = await this.prisma.aiScript.findUnique({
@@ -379,14 +393,27 @@ export class AiScriptsService {
     this.logger.log(`Regenerating Scene ${sceneNumber} for script ${id}`);
 
     // 5. Call AI
-    const completion = await this.groqService.checkCompletion({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      model: "llama-3.3-70b-versatile",
-      jsonMode: true,
-    });
+    let completion;
+
+    if (provider === "bedrock") {
+       completion = await this.bedrockService.checkCompletion({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        model: "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+        jsonMode: true,
+      });
+    } else {
+       completion = await this.groqService.checkCompletion({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        model: "llama-3.3-70b-versatile",
+        jsonMode: true,
+      });
+    }
 
     const responseContent = completion.choices[0].message.content;
     let newSceneData = {};

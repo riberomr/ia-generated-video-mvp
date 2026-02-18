@@ -4,10 +4,11 @@ import { AiScriptsController } from "./ai-scripts.controller";
 import { PrismaService } from "../database/prisma.service";
 import { VideosModule } from "../videos/videos.module";
 import { GroqService } from "./groq.service";
+import { BedrockService } from "./bedrock.service";
 
 @Module({
   imports: [VideosModule],
   controllers: [AiScriptsController],
-  providers: [AiScriptsService, PrismaService, GroqService],
+  providers: [AiScriptsService, PrismaService, GroqService, BedrockService],
 })
 export class AiScriptsModule {}

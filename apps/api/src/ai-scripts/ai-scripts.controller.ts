@@ -35,14 +35,15 @@ export class AiScriptsController {
   async regenerateScene(
     @Param("id") id: string,
     @Body()
-    body: { sceneNumber: number; currentScript: any; userInstruction: string },
+    body: { sceneNumber: number; currentScript: any; userInstruction: string; provider?: string },
   ) {
-    const { sceneNumber, currentScript, userInstruction } = body;
+    const { sceneNumber, currentScript, userInstruction, provider } = body;
     return this.aiScriptsService.regenerateScene(
       id,
       sceneNumber,
       currentScript,
       userInstruction,
+      provider,
     );
   }
 
