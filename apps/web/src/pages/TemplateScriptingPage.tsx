@@ -16,6 +16,11 @@ export const TemplateScriptingPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<string>("workspace");
 
+  // New state for Scene Purposes
+  const [scenePurposes, setScenePurposes] = useState<Record<string, string>>(
+    {},
+  );
+
   // Updated Metadata Form State based on new schema
   const [formData, setFormData] = useState({
     title: "",
@@ -29,8 +34,44 @@ export const TemplateScriptingPage: React.FC = () => {
     style: "Direct & Informative",
   });
 
+  // Helper to extract scene info
+  const getSceneInfo = (template: SynthesiaTemplate | null) => {
+    if (!template || !template.variables) return { count: 0, purposes: {} };
+
+    let maxScene = 0;
+    const initialPurposes: Record<string, string> = {};
+
+    template.variables.forEach((v) => {
+      const label = v.label || v.id || "";
+
+      // Check for Scene Count
+      const match = label.match(/scene_(\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxScene) maxScene = num;
+      }
+
+      // Check for Existing Purpose Variables (INFO_...)
+      const infoMatch = label.match(/INFO_(.+)_scene_(\d+)/);
+      if (infoMatch) {
+        const purposeText = infoMatch[1].replace(/_/g, " ");
+        const sceneNum = infoMatch[2];
+        // Only set if not already set by user (though this runs on select, so user hasn't set anything yet)
+        initialPurposes[sceneNum] = purposeText;
+      }
+    });
+
+    return { count: maxScene, purposes: initialPurposes };
+  };
+
+  const [sceneCount, setSceneCount] = useState(0);
+
   const handleTemplateSelect = (template: SynthesiaTemplate) => {
     setSelectedTemplate(template);
+    const info = getSceneInfo(template);
+    setSceneCount(info.count);
+    // Use the parsed purposes directly. We don't force fill gaps anymore to avoid creating unnecessary keys
+    setScenePurposes(info.purposes);
     setStep(2);
   };
 
@@ -77,6 +118,12 @@ export const TemplateScriptingPage: React.FC = () => {
     if (selectedTemplate) {
       apiFormData.append("templateId", selectedTemplate.id);
     }
+
+    // Add Scene Purposes map
+    if (Object.keys(scenePurposes).length > 0) {
+      apiFormData.append("scenePurposes", JSON.stringify(scenePurposes));
+    }
+
     apiFormData.append(
       "title",
       formData.title || formData.courseName || "Untitled Course Video",
@@ -304,6 +351,57 @@ export const TemplateScriptingPage: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Scene Purposes Section */}
+              {sceneCount > 0 && (
+                <div className="mt-8 border-t pt-6">
+                  <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                      {sceneCount}
+                    </span>
+                    {t(
+                      "template_scripting.scene_objectives_title",
+                      "Objetivos por Escena",
+                    )}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {t(
+                      "template_scripting.scene_objectives_desc",
+                      "Define el propósito específico de cada escena para guiar a la IA. (Opcional)",
+                    )}
+                  </p>
+                  <div className="space-y-3">
+                    {Array.from({ length: sceneCount }, (_, i) => i + 1).map(
+                      (num) => {
+                        // Render input for ALL scenes detected, regardless of whether they have a pre-existing INFO variable.
+                        // This allows user to define new purposes for any scene.
+                        return (
+                          <div key={num} className="flex items-center gap-3">
+                            <label className="text-sm font-bold text-gray-500 w-20 flex-shrink-0">
+                              {t("script_editor.scene")} {num}
+                            </label>
+                            <input
+                              type="text"
+                              value={scenePurposes[num] || ""}
+                              onChange={(e) =>
+                                setScenePurposes((prev) => ({
+                                  ...prev,
+                                  [num]: e.target.value,
+                                }))
+                              }
+                              className="flex-grow border rounded p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder={t(
+                                "template_scripting.scene_objective_placeholder",
+                                `Ej: Presentación del tema, Cierre motivacional...`,
+                              )}
+                            />
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

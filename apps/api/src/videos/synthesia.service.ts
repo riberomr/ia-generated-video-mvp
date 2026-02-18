@@ -96,7 +96,27 @@ export class SynthesiaService {
     if (script.templateId) {
       endpoint = "/videos/fromTemplate";
       payload.templateId = script.templateId;
-      payload.templateData = script.templateData;
+
+      // Filter out internal metadata variables (INFO_...)
+      let cleanTemplateData: Record<string, any> = {};
+
+      if ((script.templateData as any).data) {
+        // NEW STRUCTURE: Use the .data property
+        cleanTemplateData = {
+          ...((script.templateData as any).data as Record<string, any>),
+        };
+      } else {
+        // OLD STRUCTURE: Use the root object
+        cleanTemplateData = { ...(script.templateData as Record<string, any>) };
+      }
+
+      Object.keys(cleanTemplateData).forEach((key) => {
+        if (key.startsWith("INFO_")) {
+          cleanTemplateData[key] = " "; // Send empty string (not space) as per user requirement
+        }
+      });
+
+      payload.templateData = cleanTemplateData;
     } else {
       // Fallback or Basic generation (if we implemented it)
       // For now, if no templateId, we can't generate with this flow easily unless we map avatars/voices

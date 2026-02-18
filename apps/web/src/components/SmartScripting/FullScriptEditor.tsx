@@ -7,6 +7,8 @@ import { ScriptMetadataEditor, ScriptMetadata } from "./ScriptMetadataEditor";
 interface Props {
   data: Record<string, string>;
   onChange: (newData: Record<string, string>) => void;
+  scenePurposes?: Record<string, string>;
+  onScenePurposesChange?: (newPurposes: Record<string, string>) => void;
   title?: string;
   templateName?: string;
   onRegenerateScene?: (
@@ -20,6 +22,8 @@ interface Props {
 export function FullScriptEditor({
   data,
   onChange,
+  scenePurposes = {},
+  onScenePurposesChange,
   title: _title,
   templateName,
   onRegenerateScene,
@@ -42,6 +46,12 @@ export function FullScriptEditor({
 
   const handleChange = (key: string, val: string) => {
     onChange({ ...data, [key]: val });
+  };
+
+  const handlePurposeChange = (sceneNum: string, val: string) => {
+    if (onScenePurposesChange) {
+      onScenePurposesChange({ ...scenePurposes, [sceneNum]: val });
+    }
   };
 
   const handleOpenRegen = (sceneNum: number) => {
@@ -75,15 +85,33 @@ export function FullScriptEditor({
 
   // 1. Group variables
   const globals: string[] = [];
-  const scenes: Record<string, { visuals: string[]; voice?: string }> = {};
+  const scenes: Record<
+    string,
+    { visuals: string[]; voice?: string; purpose?: string }
+  > = {};
 
   Object.keys(data).forEach((key) => {
+    // Check for INFO purpose variables first
+    if (key.startsWith("INFO_")) {
+      const match = key.match(/_scene_(\d+)$/);
+      if (match) {
+        const num = match[1];
+        if (!scenes[num]) scenes[num] = { visuals: [] };
+        scenes[num].purpose = key;
+        return;
+      }
+    }
+
     // 1. Check if the key belongs to a specific scene via suffix
     const sceneMatch = key.match(/_scene_(\d+)$/);
 
     if (sceneMatch) {
       const sceneNum = sceneMatch[1];
       if (!scenes[sceneNum]) scenes[sceneNum] = { visuals: [] };
+
+      // Ensure purpose is marked as available if passed in props,
+      // even if no variable exists (though we render based on sortedSceneNums)
+      // Actually, we want to render the purpose input for EVERY scene found.
 
       if (key.startsWith("script_voice_text_")) {
         scenes[sceneNum].voice = key;
@@ -165,22 +193,76 @@ export function FullScriptEditor({
           </div>
 
           <div className="space-y-6">
+            {/* Purpose for this scene */}
+            {/* Render input if scenePurposes is available OR if there is a variable binding */}
+            {(onScenePurposesChange || scenes[num].purpose) && (
+              <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
+                <label className="block text-xs font-bold text-yellow-700 uppercase mb-1">
+                  {t(
+                    "script_editor.scene_purpose_label",
+                    "Propósito de la Escena",
+                  )}
+                </label>
+                {/* 
+                   Priority:
+                   1. If onScenePurposesChange exists, use scenePurposes[num] (New Way)
+                   2. Fallback: If scenes[num].purpose exists, use data[key] (Old Way with INFO_ var)
+                */}
+                <input
+                  type="text"
+                  value={
+                    onScenePurposesChange
+                      ? scenePurposes[num] || ""
+                      : scenes[num].purpose
+                        ? data[scenes[num].purpose!]
+                        : ""
+                  }
+                  onChange={(e) => {
+                    if (onScenePurposesChange) {
+                      handlePurposeChange(num, e.target.value);
+                    } else if (scenes[num].purpose) {
+                      handleChange(scenes[num].purpose!, e.target.value);
+                    }
+                  }}
+                  className="w-full bg-transparent border-none p-0 text-sm text-yellow-900 focus:ring-0 placeholder-yellow-400"
+                  placeholder={t(
+                    "script_editor.scene_purpose_placeholder",
+                    "Sin propósito definido",
+                  )}
+                  disabled={!onScenePurposesChange && !scenes[num].purpose}
+                />
+              </div>
+            )}
+
             {/* Visuals for this scene */}
             {scenes[num].visuals.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {scenes[num].visuals.map((key) => (
-                  <div key={key}>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                      {key.replace(`_scene_${num}`, "").replace(/_/g, " ")}
-                    </label>
-                    <input
-                      type="text"
-                      value={data[key]}
-                      onChange={(e) => handleChange(key, e.target.value)}
-                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                    />
-                  </div>
-                ))}
+                {scenes[num].visuals.map((key) => {
+                  // FILTER OUT INFO_ VARIABLES FROM VISUALS LIST
+                  // We don't want them here as they are treated as "Purpose" above or hidden
+                  // But wait, we already handle INFO_ variables by assigning them to 'purpose' in the grouping logic?
+                  // Let's verify.
+                  // The grouping logic:
+                  // 1. Checks key.startsWith("INFO_") -> assign to scenes[num].purpose -> return.
+                  // So they are NOT added to scenes[num].visuals.
+                  // HOWEVER, if there are OTHER variables that start with INFO_ but don't match the regex, they might leak?
+                  // Or if we change logic.
+                  // Currently safe because of "return" in loop.
+
+                  return (
+                    <div key={key}>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                        {key.replace(`_scene_${num}`, "").replace(/_/g, " ")}
+                      </label>
+                      <input
+                        type="text"
+                        value={data[key]}
+                        onChange={(e) => handleChange(key, e.target.value)}
+                        className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
 

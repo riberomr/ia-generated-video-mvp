@@ -29,6 +29,9 @@ export function ScriptEditor() {
   const [saving, setSaving] = useState(false);
   const [script, setScript] = useState<AiScript | null>(null);
   const [templateData, setTemplateData] = useState<Record<string, string>>({});
+  const [scenePurposes, setScenePurposes] = useState<Record<string, string>>(
+    {},
+  );
   const [templateName, setTemplateName] = useState<string>("");
   const [metadata, setMetadata] = useState<ScriptMetadata>({
     title: "",
@@ -81,18 +84,37 @@ export function ScriptEditor() {
         }
 
         if (data.templateData) {
-          // Start with what's in DB.
-          // If templateData is complex, FullScriptEditor might need generic JSON handling
-          // or flattening. Assuming flat or handled by FullScriptEditor.
-          // Synthesia template data is usually { "variable_name": "value" }
-          // If it is nested in "variables", we extract it.
-          const vars =
-            (data.templateData as any).variables || data.templateData;
+          // Handle new structure { data: {}, scenePurposes: {} }
+          let vars: any = {};
+          let purposes: any = {};
+
+          if ((data.templateData as any).data) {
+            // New Structure
+            vars = (data.templateData as any).data;
+            purposes = (data.templateData as any).scenePurposes || {};
+          } else {
+            // Old Structure (flat or inside variables)
+            vars = (data.templateData as any).variables || data.templateData;
+            purposes = {};
+            // Try to extract purposes from INFO_ keys in old structure
+            if (vars) {
+              Object.keys(vars).forEach((key) => {
+                if (key.startsWith("INFO_")) {
+                  const match = key.match(/_scene_(\d+)/);
+                  if (match) {
+                    purposes[match[1]] = vars[key];
+                  }
+                }
+              });
+            }
+          }
+
           setTemplateData(vars || {});
+          setScenePurposes(purposes || {});
         }
       } catch (error) {
         console.error(error);
-        toast.error(t('toast.failed_load_script'));
+        toast.error(t("toast.failed_load_script"));
       } finally {
         setLoading(false);
       }
@@ -111,7 +133,10 @@ export function ScriptEditor() {
       // Let's assume we save it as the 'templateData' field directly.
 
       const payload = {
-        templateData: templateData,
+        templateData: {
+          data: templateData,
+          scenePurposes: scenePurposes,
+        },
         ...metadata,
       };
 
@@ -126,11 +151,11 @@ export function ScriptEditor() {
 
       if (!response.ok) throw new Error("Failed to save script");
 
-      toast.success(t('toast.script_updated'));
+      toast.success(t("toast.script_updated"));
       navigate("/"); // Go back to saved scripts
     } catch (error) {
       console.error(error);
-      toast.error(t('toast.failed_save_script'));
+      toast.error(t("toast.failed_save_script"));
     } finally {
       setSaving(false);
     }
@@ -151,7 +176,10 @@ export function ScriptEditor() {
           sceneNumber: sceneNum,
           currentScript: {
             ...script,
-            templateData: templateData,
+            templateData: {
+              data: templateData,
+              scenePurposes: scenePurposes,
+            },
           },
           userInstruction: instruction,
         }),
@@ -168,18 +196,22 @@ export function ScriptEditor() {
 
   if (loading)
     return (
-      <div className="p-8 text-center text-gray-500">{t('loading.script')}</div>
+      <div className="p-8 text-center text-gray-500">{t("loading.script")}</div>
     );
 
   if (!script)
-    return <div className="p-8 text-center text-red-500">{t('script_editor.script_not_found')}</div>;
+    return (
+      <div className="p-8 text-center text-red-500">
+        {t("script_editor.script_not_found")}
+      </div>
+    );
 
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {t('script_editor.page_title')}
+            {t("script_editor.page_title")}
           </h1>
         </div>
 
@@ -188,14 +220,14 @@ export function ScriptEditor() {
             onClick={() => navigate("/")}
             className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm hover:bg-gray-50"
           >
-            {t('actions.back')}
+            {t("actions.back")}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="bg-indigo-600 text-white px-6 py-2 rounded shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? t('actions.saving') : t('actions.save')}
+            {saving ? t("actions.saving") : t("actions.save")}
           </button>
         </div>
       </div>
@@ -204,6 +236,8 @@ export function ScriptEditor() {
         <FullScriptEditor
           data={templateData}
           onChange={(newData) => setTemplateData(newData)}
+          scenePurposes={scenePurposes}
+          onScenePurposesChange={setScenePurposes}
           title={script.title}
           templateName={templateName}
           onRegenerateScene={handleRegenerateScene}

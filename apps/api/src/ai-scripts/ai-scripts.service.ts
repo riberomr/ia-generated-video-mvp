@@ -77,6 +77,15 @@ export class AiScriptsService {
       templateId,
     } = metadata;
 
+    let scenePurposes: Record<string, string> = {};
+    try {
+      if (metadata.scenePurposes) {
+        scenePurposes = JSON.parse(metadata.scenePurposes);
+      }
+    } catch (e) {
+      this.logger.warn("Failed to parse scenePurposes", e);
+    }
+
     // 1. Extract content from files
     let sourceContent = "";
     for (const file of files) {
@@ -126,7 +135,7 @@ export class AiScriptsService {
     }
 
     // 3. Call AI to generate script and fill template variables
-    let templateData = {};
+    let templateDataValues: Record<string, string> = {};
 
     // Normalize title to ensure it's a string, handling potential array input
     let finalTitle = title || courseName || "Untitled Script";
@@ -174,22 +183,31 @@ export class AiScriptsService {
 
         // Convert rawTemplateVariables to the JSON structure expected by the prompt
         // The prompt expects a JSON where keys are the labels/ids to be filled
+        // Filter out INFO_ variables so AI doesn't try to fill them
+        const variablesForPrompt = variablesArray.filter(
+          (v: any) =>
+            !(v.label && v.label.startsWith("INFO_")) &&
+            !(v.id && v.id.startsWith("INFO_")),
+        );
+
         const templateStructureForPrompt = JSON.stringify(
-          rawTemplateVariables,
+          variablesForPrompt,
           null,
           2,
         );
 
-        const systemPrompt = Prompts.mapTechnicalSheetToTemplateSystemPrompt(
-          courseName || "[Course Name]",
-          teacherName || "[Teacher Name]",
-          teacherRole || "[Role]",
-          teacherSpecialty || "",
-          studentProfile || "Students",
-          tone || "Formal",
-          style || "Direct",
-          sceneCount,
-        );
+        const systemPrompt =
+          Prompts.mapTechnicalSheetToTemplateSystemPromptWithGoals(
+            courseName || "[Course Name]",
+            teacherName || "[Teacher Name]",
+            teacherRole || "[Role]",
+            teacherSpecialty || "",
+            studentProfile || "Students",
+            tone || "Formal",
+            style || "Direct",
+            sceneCount,
+            scenePurposes,
+          );
 
         const userPrompt = Prompts.mapTechnicalSheetToTemplateUserPrompt(
           templateStructureForPrompt,
@@ -207,20 +225,41 @@ export class AiScriptsService {
 
         const responseContent = completion.choices[0].message.content;
         if (responseContent) {
-          templateData = JSON.parse(responseContent);
+          templateDataValues = JSON.parse(responseContent);
           this.logger.log("AI Generation successful.");
         } else {
           this.logger.warn("AI Generation returned empty content.");
         }
 
+        // --- HANDLE INFO_ VARIABLES AND SYNC PURPOSES ---
+        // Force INFO_ variables to be " " (space) in the data payload
+        variablesArray.forEach((v: any) => {
+          const key = v.label || v.id || "";
+          if (key.startsWith("INFO_")) {
+            // Force empty space for visual variable
+            templateDataValues[key] = " ";
+
+            // Sync purpose if not already set by user
+            const match = key.match(/_scene_(\d+)/);
+            if (match) {
+              const sceneNum = match[1];
+              const purposeMatch = key.match(/INFO_(.+)_scene_\d+/);
+              if (purposeMatch && !scenePurposes[sceneNum]) {
+                scenePurposes[sceneNum] = purposeMatch[1].replace(/_/g, " ");
+              }
+            }
+          }
+        });
+        // ------------------------------------------------
+
         // --- BACKFILL LOGIC: Ensure all template variables are present ---
         if (variablesArray.length > 0) {
           variablesArray.forEach((variable: any) => {
             const key = variable.label || variable.id; // Synthesia uses label as key for generating video
-            if (key && !templateData.hasOwnProperty(key)) {
+            if (key && !templateDataValues.hasOwnProperty(key)) {
               // Use default value if available, otherwise empty string
               // Note: Synthesia API might fail if required fields are missing, but empty string is safer than undefined
-              templateData[key] =
+              templateDataValues[key] =
                 variable.value !== undefined && variable.value !== null
                   ? variable.value
                   : " ";
@@ -235,6 +274,12 @@ export class AiScriptsService {
       // We continue creation even if AI fails, saving empty templateData
     }
 
+    // NEW STRUCTURE: Wrap data and scenePurposes
+    const finalTemplateData = {
+      data: templateDataValues,
+      scenePurposes: scenePurposes,
+    };
+
     return this.prisma.aiScript.create({
       data: {
         title: finalTitle,
@@ -248,7 +293,7 @@ export class AiScriptsService {
         style: style || "",
         templateId: templateId || "",
         templateName: templateName || null,
-        templateData: templateData,
+        templateData: finalTemplateData, // SAVING NEW STRUCTURE
         sourceContent: sourceContent,
         rawTemplateVariables: rawTemplateVariables,
       },
@@ -271,12 +316,22 @@ export class AiScriptsService {
     }
 
     // 2. Identify variables for the requested scene
-    // We assume currentScript.templateData holds the current state of variables
-    const currentData = currentScript.templateData || {};
+    // HANDLE NEW STRUCTURE: Check if templateData has .data property
+    const rawTemplateData = currentScript.templateData || {};
+    let currentData = rawTemplateData;
+    let currentPurposes = {};
+
+    if (rawTemplateData.data) {
+      currentData = rawTemplateData.data;
+      currentPurposes = rawTemplateData.scenePurposes || {};
+    }
+
     const sceneVariables: Record<string, any> = {};
 
-    // Filter variables for the specific scene
+    // Filter variables for the specific scene AND EXCLUDE INFO_
     Object.keys(currentData).forEach((key) => {
+      if (key.startsWith("INFO_")) return; // Don't send INFO variables to AI for regeneration
+
       if (
         key.includes(`_scene_${sceneNumber}`) ||
         key.endsWith(`_${sceneNumber}`)
@@ -300,6 +355,10 @@ export class AiScriptsService {
       currentData[nextVoiceKey] || currentData[nextVoiceKeyLegacy] || "";
 
     // 4. Generate Prompts
+    // Inyectar el propósito de la escena si existe
+    // TODO: We could inject the specific purpose into the instruction if we wanted to enforce it during regeneration
+    // For now we stick to userInstruction but we could append: `Remember the original goal: ${currentPurposes[sceneNumber]}` if beneficial.
+
     const systemPrompt = Prompts.regenerateSceneSystemPrompt(
       script.courseName || "",
       script.teacherName || "",
