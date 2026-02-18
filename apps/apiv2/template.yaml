@@ -12,6 +12,8 @@ Globals:
         DATABASE_URL: !Ref DatabaseUrl
         GROQ_API_KEY: !Ref GroqApiKey
         SYNTHESIA_API_KEY: !Ref SynthesiaApiKey
+        DB_PROVIDER: !Ref DbProvider
+        DYNAMO_ENDPOINT: !Ref DynamoEndpoint
 
 Parameters:
   DatabaseUrl:
@@ -26,6 +28,14 @@ Parameters:
     Type: String
     Description: Synthesia API key for video generation
     NoEcho: true
+  DbProvider:
+    Type: String
+    Description: Database provider (prisma or dynamodb)
+    Default: prisma
+  DynamoEndpoint:
+    Type: String
+    Description: DynamoDB Endpoint URL (for local testing)
+    Default: ""
 
 Resources:
   # ── API Gateway ────────────────────────────────────────────────────────────
@@ -40,6 +50,36 @@ Resources:
       BinaryMediaTypes:
         - "multipart/form-data"
 
+  # ── DynamoDB Table ────────────────────────────────────────────────────────
+  CourseBuilderTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CourseBuilderTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: Type
+          AttributeType: S
+        - AttributeName: CreatedAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: Type
+              KeyType: HASH
+            - AttributeName: CreatedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
   # ── Lambda 1: AI Scripts API ──────────────────────────────────────────────
   AiScriptsFunction:
     Type: AWS::Serverless::Function
@@ -53,9 +93,12 @@ Resources:
       Environment:
         Variables:
           WORKER_FUNCTION_NAME: !Ref AiScriptsWorkerFunction
+          TABLE_NAME: !Ref CourseBuilderTable
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref AiScriptsWorkerFunction
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CourseBuilderTable
       Events:
         CreateScript:
           Type: Api

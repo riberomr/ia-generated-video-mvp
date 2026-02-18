@@ -1,16 +1,20 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
 import { LambdaClient, InvokeCommand, InvocationType } from "@aws-sdk/client-lambda";
-import { getPrisma } from "../lib/prisma";
 import * as groq from "../lib/groq";
 import * as synthesia from "../lib/synthesia";
 import * as fileExtraction from "../lib/file-extraction";
 import * as Prompts from "../lib/prompts";
 import { ok, created, accepted, notFound, badRequest, serverError } from "../lib/response";
 import Busboy from "busboy";
+import { getRepository } from "../repositories";
+import { AiScript } from "../repositories/IAiScriptRepository";
 
-const prisma = getPrisma();
+// Initialize Lambda Client
 const lambda = new LambdaClient({ region: process.env.AWS_REGION });
 const WORKER_FUNCTION_NAME = process.env.WORKER_FUNCTION_NAME;
+
+// Helper to get repo on demand (ensures env vars are read per request if needed)
+const repo = () => getRepository();
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,6 +26,10 @@ interface WorkerPayload {
 
 // ── Router ──────────────────────────────────────────────────────────────────
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  console.log("HANDLER INVOKED");
+  console.log("DB_PROVIDER:", process.env.DB_PROVIDER);
+  console.log("AWS_SAM_LOCAL:", process.env.AWS_SAM_LOCAL);
+
   const method = event.httpMethod;
   const path = event.path;
   const id = event.pathParameters?.id;
@@ -69,10 +77,7 @@ export async function worker(event: WorkerPayload, context: Context): Promise<vo
     }
   } catch (error: any) {
     console.error("Worker failed:", error);
-    await prisma.aiScript.update({
-      where: { id: scriptId },
-      data: { status: "FAILED" }
-    });
+    await repo().updateStatus(scriptId, "FAILED");
   }
 }
 
@@ -90,10 +95,7 @@ async function processGenerateScript(scriptId: string, payload: any) {
     scenePurposes
   } = payload;
 
-  await prisma.aiScript.update({
-    where: { id: scriptId },
-    data: { status: "PROCESSING" }
-  });
+  await repo().updateStatus(scriptId, "PROCESSING");
 
   // Calculate scene count
   let sceneCount = 0;
@@ -187,22 +189,16 @@ async function processGenerateScript(scriptId: string, payload: any) {
     scenePurposes,
   };
 
-  await prisma.aiScript.update({
-    where: { id: scriptId },
-    data: {
+  await repo().update(scriptId, {
       templateData: finalTemplateData,
       status: "COMPLETED"
-    }
   });
 }
 
 async function processRegenerateScene(scriptId: string, payload: any) {
   const { sceneNumber, currentScript, userInstruction } = payload;
   
-  await prisma.aiScript.update({
-    where: { id: scriptId },
-    data: { status: "PROCESSING" }
-  });
+  await repo().updateStatus(scriptId, "PROCESSING");
 
   // Prepare prompts reusing existing logic
   const rawTemplateData = currentScript?.templateData || {};
@@ -264,12 +260,9 @@ async function processRegenerateScene(scriptId: string, payload: any) {
         data: updatedData
     };
 
-    await prisma.aiScript.update({
-      where: { id: scriptId },
-      data: {
+    await repo().update(scriptId, {
         templateData: updatedTemplateData,
         status: "COMPLETED"
-      }
     });
   } else {
     throw new Error("AI response was empty");
@@ -280,44 +273,36 @@ async function processRegenerateScene(scriptId: string, payload: any) {
 
 async function handleCreate(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   const body = JSON.parse(event.body || "{}");
-  const script = await prisma.aiScript.create({ 
-      data: {
-          ...body,
-          status: "PENDING"
-      } 
+  const script = await repo().create({ 
+      ...body,
+      status: "PENDING"
   });
   return created(script);
 }
 
 async function handleFindAll(): Promise<APIGatewayProxyResult> {
-  const scripts = await prisma.aiScript.findMany({
-    where: { isDeleted: false },
-    orderBy: { createdAt: "desc" },
-    include: { videos: { where: { isDeleted: false } } },
-  });
+  const scripts = await repo().findAll();
   return ok(scripts);
 }
 
 async function handleFindOne(id: string): Promise<APIGatewayProxyResult> {
-  const script = await prisma.aiScript.findFirst({
-    where: { id, isDeleted: false },
-    include: { videos: { where: { isDeleted: false } } },
-  });
+  // Logic to include videos is currently specific to Prisma/Postgres capability
+  // For now, the repository interface returns the script. 
+  // If videos are needed, we might need to extend the repository or do a separate fetch if using Dynamo.
+  // The current Prisma implementation includes videos. The Dynamo implementation should also include videos (via query).
+  const script = await repo().findById(id);
   if (!script) return notFound("Script not found");
   return ok(script);
 }
 
 async function handleUpdate(id: string, event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   const body = JSON.parse(event.body || "{}");
-  const script = await prisma.aiScript.update({ where: { id }, data: body });
+  const script = await repo().update(id, body);
   return ok(script);
 }
 
 async function handleRemove(id: string): Promise<APIGatewayProxyResult> {
-  const script = await prisma.aiScript.update({
-    where: { id },
-    data: { isDeleted: true },
-  });
+  const script = await repo().update(id, { isDeleted: true });
   return ok(script);
 }
 
@@ -393,24 +378,22 @@ async function handleGenerateFromFiles(
   if (Array.isArray(finalTitle)) finalTitle = finalTitle[0];
 
   // 3. Create Record (PENDING)
-  const script = await prisma.aiScript.create({
-    data: {
-      title: finalTitle,
-      courseName: courseName || "",
-      teacherName: teacherName || "",
-      teacherRole: teacherRole || "",
-      teacherSpecialty: teacherSpecialty || "",
-      studentProfile: studentProfile || "",
-      videoType: videoType || "Course Welcome",
-      tone: tone || "",
-      style: style || "",
-      templateId: templateId || "",
-      templateName,
-      templateData: {}, // Empty initially
-      sourceContent,
-      rawTemplateVariables,
-      status: "PENDING"
-    },
+  const script = await repo().create({
+    title: finalTitle,
+    courseName: courseName || "",
+    teacherName: teacherName || "",
+    teacherRole: teacherRole || "",
+    teacherSpecialty: teacherSpecialty || "",
+    studentProfile: studentProfile || "",
+    videoType: videoType || "Course Welcome",
+    tone: tone || "",
+    style: style || "",
+    templateId: templateId || "",
+    templateName,
+    templateData: {}, // Empty initially
+    sourceContent,
+    rawTemplateVariables,
+    status: "PENDING"
   });
 
   // 4. Invoke Worker
@@ -443,14 +426,11 @@ async function handleRegenerateScene(
   const body = JSON.parse(event.body || "{}");
   const { sceneNumber, currentScript, userInstruction } = body;
 
-  const script = await prisma.aiScript.findUnique({ where: { id } });
+  const script = await repo().findById(id);
   if (!script) return notFound("Script not found");
 
   // Validate we can proceed
-  await prisma.aiScript.update({
-      where: { id },
-      data: { status: "PROCESSING" }
-  });
+  await repo().updateStatus(id, "PROCESSING");
 
   const payload: WorkerPayload = {
       type: 'REGENERATE_SCENE',
@@ -490,10 +470,7 @@ async function invokeWorker(payload: WorkerPayload) {
     } catch (e) {
         console.error("Failed to invoke worker", e);
         // Fallback: DB fail?
-        await prisma.aiScript.update({
-            where: { id: payload.scriptId },
-            data: { status: "FAILED" }
-        });
+        await repo().updateStatus(payload.scriptId, "FAILED");
     }
 }
 
@@ -560,7 +537,7 @@ const parseMultipart = (event: APIGatewayProxyEvent): Promise<ParsedBody> => {
     const isBase64 = event.isBase64Encoded;
     busboy.write(
       isBase64 ? Buffer.from(bodyToCheck, "base64") : bodyToCheck,
-      isBase64 ? undefined : "utf-8",
+      isBase64 ? undefined : "utf-8", // Fix overload issue by passing explicit undefined/string
     );
     busboy.end();
   });

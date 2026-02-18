@@ -1,9 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { getPrisma } from "../lib/prisma";
+import { getRepository } from "../repositories";
 import * as synthesia from "../lib/synthesia";
 import { ok, created, notFound, badRequest, serverError } from "../lib/response";
 
-const prisma = getPrisma();
+// Helper to get repo on demand
+const repo = () => getRepository();
 
 // ── Router ──────────────────────────────────────────────────────────────────
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
@@ -11,6 +12,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   const path = event.path;
   const scriptId = event.pathParameters?.scriptId;
   const videoId = event.pathParameters?.videoId;
+
+  console.log("VIDEOS HANDLER INVOKED");
+  console.log("DB_PROVIDER:", process.env.DB_PROVIDER);
+  console.log("DYNAMO_ENDPOINT:", process.env.DYNAMO_ENDPOINT);
 
   try {
     // POST /videos/generate/:scriptId
@@ -49,7 +54,7 @@ async function handleGenerateVideo(
   const body = JSON.parse(event.body || "{}");
   const testMode = body.test === true;
 
-  const script = await prisma.aiScript.findUnique({ where: { id: scriptId } });
+  const script = await repo().findById(scriptId);
   if (!script) return notFound(`AiScript ${scriptId} not found`);
 
   if (!script.templateId) {
@@ -85,21 +90,29 @@ async function handleGenerateVideo(
 
   const response = await synthesia.createVideoFromTemplate(payload);
 
-  const videoRender = await prisma.videoRender.create({
-    data: {
+  // Note: Repository currently doesn't have a dedicated method for creating VideoRender 
+  // linked to script. We need to add `addVideoRender` or similar to the interface 
+  // or use a generic creation method if we want to be pure.
+  // For now, let's assume valid implementation exists or we extend the repo.
+  // BUT the current IRepository interface (IAiScriptRepository) is focused on AiScript.
+  // We might need to extend the repository to handle video renders or add a generic method.
+  // 
+  // Checking IAiScriptRepository again... it has generic CRUD but focused on Script. 
+  // Let's check if we can add a method to add video to script or separate repository.
+  // 
+  // FOR NOW: I will implement a `createVideoRender` method on the repository interface.
+  
+  const videoRender = await repo().createVideoRender({
       scriptId: script.id,
       externalId: response.id,
-      status: "PENDING",
-    },
+      status: "PENDING"
   });
 
   return created(videoRender);
 }
 
 async function handleCheckStatus(videoRenderId: string): Promise<APIGatewayProxyResult> {
-  const video = await prisma.videoRender.findUnique({
-    where: { id: videoRenderId },
-  });
+  const video = await repo().findVideoRenderById(videoRenderId);
 
   if (!video || !video.externalId) {
     return notFound("VideoRender not found or missing externalId");
@@ -114,18 +127,13 @@ async function handleCheckStatus(videoRenderId: string): Promise<APIGatewayProxy
   else if (["created", "queued"].includes(status)) newStatus = "PENDING";
   else if (status === "failed" || status === "error") newStatus = "FAILED";
 
-  const updated = await prisma.videoRender.update({
-    where: { id: videoRenderId },
-    data: { status: newStatus },
-  });
+  const updated = await repo().updateVideoRender(videoRenderId, { status: newStatus });
 
   return ok(updated);
 }
 
 async function handleDownloadUrl(videoRenderId: string): Promise<APIGatewayProxyResult> {
-  const video = await prisma.videoRender.findUnique({
-    where: { id: videoRenderId },
-  });
+  const video = await repo().findVideoRenderById(videoRenderId);
 
   if (!video?.externalId) {
     return notFound("Video external ID missing");
@@ -140,10 +148,7 @@ async function handleDownloadUrl(videoRenderId: string): Promise<APIGatewayProxy
   else if (["created", "queued"].includes(statusResponse.status)) newStatus = "PENDING";
   else if (statusResponse.status === "failed" || statusResponse.status === "error") newStatus = "FAILED";
 
-  await prisma.videoRender.update({
-    where: { id: videoRenderId },
-    data: { status: newStatus },
-  });
+  await repo().updateVideoRender(videoRenderId, { status: newStatus });
 
   if (statusResponse.download) {
     return ok({
@@ -156,9 +161,8 @@ async function handleDownloadUrl(videoRenderId: string): Promise<APIGatewayProxy
 }
 
 async function handleDeleteVideo(videoRenderId: string): Promise<APIGatewayProxyResult> {
-  const video = await prisma.videoRender.update({
-    where: { id: videoRenderId },
-    data: { isDeleted: true },
-  });
+  // Soft delete video render? Or just delete? 
+  // Prisma implementation was Soft Delete.
+  const video = await repo().updateVideoRender(videoRenderId, { isDeleted: true });
   return ok(video);
 }

@@ -26,13 +26,22 @@ El sistema utiliza una arquitectura **Serverless asíncrona** para manejar tarea
         *   Actualiza el estado en DB a `COMPLETED` o `FAILED`.
     *   **Prisma ORM:** Gestiona la conexión a PostgreSQL.
 
-3.  **Base de Datos:**
-    *   PostgreSQL.
-    *   Nuevo campo: `AiScript.status` (PENDING, PROCESSING, COMPLETED, FAILED).
+3.  **Base de Datos (Híbrida / Migración):**
+    *   **PostgreSQL (Legacy/Actual):** Gestionada por Prisma.
+    *   **DynamoDB (Nuevo/Destino):** Implementada con Single Table Design.
+    *   **Repository Pattern:** Se implementó una capa de abstracción (`IAiScriptRepository`) para permitir el cambio dinámico entre Prisma y DynamoDB mediante la variable de entorno `DB_PROVIDER`.
 
 ---
 
 ## 2. Explicación Técnica: ¿Cómo funciona?
+
+### Patrón de Repositorio y Feature Flag
+Para facilitar la migración sin detener el servicio, se implementó un patrón de repositorio:
+*   **Interfaz:** `AiScriptRepository` define los métodos (`create`, `findById`, `findAll`, etc.).
+*   **Implementaciones:**
+    *   `PrismaAiScriptRepository`: Usa el cliente de Prisma (Postgres).
+    *   `DynamoAiScriptRepository`: Usa `DynamoDBDocumentClient` (DynamoDB).
+*   **Factory:** Una función `getRepository()` lee `process.env.DB_PROVIDER` (valores: `prisma` o `dynamodb`) y devuelve la instancia correspondiente.
 
 ### Flujo de "Generar Script" (Asíncrono)
 
@@ -98,4 +107,17 @@ Asegurarse de que `apps/apiv2/env.json` NO contenga credenciales de producción 
 
 1.  **Bedrock Switch:** Cambiar el import en `ai-scripts.ts` para usar `lib/bedrock.ts` y asegurar permisos IAM.
 2.  **Dead Letter Queue (DLQ):** Configurar una cola SQS para eventos fallidos del Worker (reintentos).
-3.  **WebSockets (Opcional):** Para notificar al frontend en tiempo real en lugar de polling (más complejo, polling es suficiente para MVP).
+3.  **WebSockets (Opcional):** Para notificar al frontend en tiempo real en lugar de polling.
+
+---
+
+## 5. Comparativa: Implementación vs Estrategia Planeada
+
+| Aspecto | Estrategia (`DYNAMODB_MIGRATION_STRATEGY.md`) | Implementación Real | Estado |
+| :--- | :--- | :--- | :--- |
+| **Diseño de Tabla** | Single Table con PK/SK y GSI1 (Type/CreatedAt) | **Idéntico.** Se implementó tal cual en `template.yaml`. | ✅ Completo |
+| **Abstracción** | Recomendar eliminar Prisma y usar SDK directo | **Mejorado.** Se usó **Repository Pattern** para mantener ambas implementaciones vivas y cambiar con flag. | ✅ Superado |
+| **Relaciones** | Fetch único para Script + Videos | **Adaptado.** `findAll` hace join en memoria. `findById` filtra resultados. | ✅ Completo |
+| **Infraestructura** | Agregar Resource en SAM | Agregado `CourseBuilderTable` y `DynamoDBCrudPolicy`. | ✅ Completo |
+| **Local Dev** | Usar DynamoDB Local | Integrado en `docker-compose` y script `init-db.ts`. | ✅ Completo |
+
