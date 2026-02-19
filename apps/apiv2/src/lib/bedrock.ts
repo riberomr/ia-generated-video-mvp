@@ -14,7 +14,7 @@ export async function checkCompletion(config: {
 }): Promise<any> {
   const {
     messages,
-    model = "us.anthropic.claude-3-5-sonnet-20240620-v1:0",
+    model = "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
     jsonMode = false,
   } = config;
 

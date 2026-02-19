@@ -1,6 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
 import { LambdaClient, InvokeCommand, InvocationType } from "@aws-sdk/client-lambda";
-import * as groq from "../lib/groq";
+import * as bedrock from "../lib/bedrock";
 import * as synthesia from "../lib/synthesia";
 import * as fileExtraction from "../lib/file-extraction";
 import * as Prompts from "../lib/prompts";
@@ -12,6 +12,7 @@ import { AiScript } from "../repositories/IAiScriptRepository";
 // Initialize Lambda Client
 const lambda = new LambdaClient({ region: process.env.AWS_REGION });
 const WORKER_FUNCTION_NAME = process.env.WORKER_FUNCTION_NAME;
+const BEDROCK_MODEL = process.env.BEDROCK_MODEL_ID || "us.anthropic.claude-3-5-sonnet-20241022-v2:0";
 
 // Helper to get repo on demand (ensures env vars are read per request if needed)
 const repo = () => getRepository();
@@ -27,14 +28,16 @@ interface WorkerPayload {
 // ── Router ──────────────────────────────────────────────────────────────────
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   console.log("HANDLER INVOKED");
-  console.log("DB_PROVIDER:", process.env.DB_PROVIDER);
   console.log("AWS_SAM_LOCAL:", process.env.AWS_SAM_LOCAL);
 
   const method = event.httpMethod;
   const path = event.path;
   const id = event.pathParameters?.id;
 
+  console.log(`[HANDLER] Method: ${method}, Path: ${path}, ID: ${id}`);
+  
   try {
+
     if (method === "POST" && path.endsWith("/generate-from-files")) {
       return handleGenerateFromFiles(event);
     }
@@ -50,11 +53,11 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     if (method === "GET" && id) {
       return handleFindOne(id);
     }
-    if (method === "PATCH" && id) {
-      return handleUpdate(id, event);
-    }
     if (method === "DELETE" && id) {
       return handleRemove(id);
+    }
+    if (method === "PATCH" && id) {
+      return handleUpdate(id, event);
     }
 
     return badRequest("Route not matched");
@@ -107,7 +110,7 @@ async function processGenerateScript(scriptId: string, payload: any) {
     const indices = variablesArray
       .map((v: any) => {
         const label = v.label || v.id || "";
-        const match = label.match(/script_voice_text_scene_(\d+)/);
+        const match = label.match(/(?:script_voice_text_scene_|text_scene_|INFO_.*_scene_|scene_)(\d+)/);
         return match ? parseInt(match[1], 10) : 0;
       })
       .filter((n: number) => n > 0);
@@ -143,12 +146,12 @@ async function processGenerateScript(scriptId: string, payload: any) {
 
   let templateDataValues: Record<string, string> = {};
 
-  const completion = await groq.checkCompletion({
+  const completion = await bedrock.checkCompletion({
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    model: "llama-3.3-70b-versatile",
+    model: BEDROCK_MODEL,
     jsonMode: true,
   });
 
@@ -239,12 +242,12 @@ async function processRegenerateScene(scriptId: string, payload: any) {
     userInstruction,
   );
 
-  const completion = await groq.checkCompletion({
+  const completion = await bedrock.checkCompletion({
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    model: "llama-3.3-70b-versatile",
+    model: BEDROCK_MODEL,
     jsonMode: true,
   });
 
@@ -475,6 +478,8 @@ async function invokeWorker(payload: WorkerPayload) {
 }
 
 
+
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 interface ParsedBody {
@@ -535,10 +540,11 @@ const parseMultipart = (event: APIGatewayProxyEvent): Promise<ParsedBody> => {
 
     const bodyToCheck = event.body || "";
     const isBase64 = event.isBase64Encoded;
-    busboy.write(
-      isBase64 ? Buffer.from(bodyToCheck, "base64") : bodyToCheck,
-      isBase64 ? undefined : "utf-8", // Fix overload issue by passing explicit undefined/string
-    );
+    if (isBase64) {
+      busboy.write(Buffer.from(bodyToCheck, "base64"));
+    } else {
+      busboy.write(bodyToCheck, "utf-8");
+    }
     busboy.end();
   });
 };

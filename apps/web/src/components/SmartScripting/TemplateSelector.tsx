@@ -23,7 +23,7 @@ const calculateScenes = (variables?: any[]): number => {
   let maxScene = 0;
   variables.forEach((v) => {
     const label = v.label || v.id || "";
-    const match = label.match(/scene_(\d+)/);
+    const match = label.match(/(?:script_voice_text_scene_|text_scene_|INFO_.*_scene_|scene_)(\d+)/);
     if (match) {
       const num = parseInt(match[1], 10);
       if (num > maxScene) maxScene = num;

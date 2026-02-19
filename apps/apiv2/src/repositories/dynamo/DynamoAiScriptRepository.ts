@@ -58,7 +58,7 @@ export class DynamoAiScriptRepository implements AiScriptRepository {
             }));
             
             const allVideos = (videoResult.Items as unknown as VideoRender[]) || [];
-            script.videos = allVideos.filter(v => v.scriptId === id);
+            script.videos = allVideos.filter(v => v.scriptId === id && !v.isDeleted);
         }
 
         return script;
@@ -89,10 +89,12 @@ export class DynamoAiScriptRepository implements AiScriptRepository {
         const videos = (videosResult.Items as unknown as VideoRender[]) || [];
 
         // Join in memory
-        return scripts.map(script => ({
-            ...script,
-            videos: videos.filter(v => v.scriptId === script.id)
-        }));
+        return scripts
+            .filter(s => !s.isDeleted)
+            .map(script => ({
+                ...script,
+                videos: videos.filter(v => v.scriptId === script.id && !v.isDeleted)
+            }));
     }
 
     async updateStatus(id: string, status: string): Promise<void> {
@@ -175,29 +177,30 @@ export class DynamoAiScriptRepository implements AiScriptRepository {
     }
 
     async updateVideoRender(id: string, data: any): Promise<VideoRender> {
-         // Construct Dynamic Update Expression
-        let updateExp = "set #updatedAt = :u";
-        const expAttrValues: any = { ":u": new Date().toISOString() };
-        const expAttrNames: any = { "#updatedAt": "updatedAt" }; // Initial map
+        console.log("DynamoDB updateVideoRender (PUT strategy) called with:", { id, data });
 
-        Object.keys(data).forEach((key, index) => {
-            if (key === "id" || key === "createdAt") return;
-            const attrKey = `#param${index}`;
-            const valKey = `:val${index}`;
-            updateExp += `, ${attrKey} = ${valKey}`;
-            expAttrNames[attrKey] = key;
-            expAttrValues[valKey] = data[key];
-        });
+        // 1. Fetch existing item
+        const existing = await this.findVideoRenderById(id);
+        if (!existing) throw new Error(`Video with ID ${id} not found`);
 
-        const result = await docClient.send(new UpdateCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: `VIDEO#${id}`, SK: "METADATA" },
-            UpdateExpression: updateExp,
-            ExpressionAttributeNames: expAttrNames,
-            ExpressionAttributeValues: expAttrValues,
-            ReturnValues: "ALL_NEW"
-        }));
+        // 2. Merge updates
+        const updatedItem = {
+            ...existing,
+            ...data,
+            updatedAt: new Date().toISOString()
+        };
 
-        return result.Attributes as unknown as VideoRender;
+        // 3. Put (overwrite) item
+        try {
+            console.log("DynamoDB Put Item:", JSON.stringify(updatedItem, null, 2));
+            await docClient.send(new PutCommand({
+                TableName: TABLE_NAME,
+                Item: updatedItem
+            }));
+            return updatedItem;
+        } catch (error) {
+            console.error("DynamoDB Put (Update) Error", error);
+            throw error;
+        }
     }
 }

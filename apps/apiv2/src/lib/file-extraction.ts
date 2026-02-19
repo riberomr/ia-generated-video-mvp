@@ -1,6 +1,10 @@
 import * as mammoth from "mammoth";
 
+import * as path from "path";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+
+// Ensure the worker is loaded from the correct location in the Lambda environment
+pdfjsLib.GlobalWorkerOptions.workerSrc = path.join(__dirname, "pdf.worker.js");
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const data = new Uint8Array(buffer);

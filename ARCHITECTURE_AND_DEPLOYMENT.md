@@ -1,123 +1,195 @@
-# Arquitectura, Funcionamiento y Despliegue en AWS
+# Arquitectura y Despliegue en AWS (Serverless)
 
-Este documento describe el estado actual del proyecto tras la implementación del patrón **Async Worker**, cómo funciona la arquitectura Serverless, y los pasos para desplegar en AWS.
+Este documento detalla la arquitectura técnica del proyecto `ia-generated-video-mvp` y la guía paso a paso para desplegarlo en AWS utilizando SAM (Serverless Application Model).
 
-## 1. Arquitectura Actual (Async Worker Pattern)
+---
 
-El sistema utiliza una arquitectura **Serverless asíncrona** para manejar tareas pesadas de IA, mejorando la escalabilidad y evitando timeouts en el API Gateway.
+## 🏗️ 1. Arquitectura del Sistema
+
+El sistema ha evolucionado de una arquitectura monolítica (NestJS) a una arquitectura **Serverless Event-Driven** para mejorar la escalabilidad, reducir costos en reposo y manejar eficientemente tareas de larga duración (generación de IA).
 
 ### Componentes Principales
 
-1.  **Frontend (apps/web):**
-    *   Aplicación React (Vite).
-    *   **Polling:** Implementa lógica de sondeo (polling) para consultar el estado de tareas asíncronas (`PENDING` -> `PROCESSING` -> `COMPLETED`).
-    *   Se comunica con el backend para iniciar trabajos (`POST`) y consultar resultados (`GET`).
+#### A. Frontend (Single Page Application)
+- **Tecnología:** React + Vite + TailwindCSS.
+- **Hosting:** S3 (Static Website Hosting) + CloudFront (CDN & HTTPS).
+- **Interacción:** Consume la REST API via HTTPS. Implementa **Polling** para verificar el estado de las tareas asíncronas de generación de video y scripts.
 
-2.  **Backend Serverless (apps/apiv2):**
-    *   **AiScriptsFunction (API Handler):** 
-        *   Recibe peticiones HTTP.
-        *   Valida input y sube archivos.
-        *   Crea registro en DB con status `PENDING`.
-        *   Desencadena asíncronamente al Worker.
-        *   Responde inmediatamente `202 Accepted`.
-    *   **AiScriptsWorkerFunction (Worker):** 
-        *   Procesa eventos de fondo (`InvocationType: Event`).
-        *   Ejecuta la llamada a la IA (Groq/Bedrock).
-        *   Actualiza el estado en DB a `COMPLETED` o `FAILED`.
-    *   **Prisma ORM:** Gestiona la conexión a PostgreSQL.
+#### B. API & Backend (AWS Lambda + API Gateway)
+El backend está dividido en micro-funciones Lambda gestionadas por SAM:
 
-3.  **Base de Datos (Híbrida / Migración):**
-    *   **PostgreSQL (Legacy/Actual):** Gestionada por Prisma.
-    *   **DynamoDB (Nuevo/Destino):** Implementada con Single Table Design.
-    *   **Repository Pattern:** Se implementó una capa de abstracción (`IAiScriptRepository`) para permitir el cambio dinámico entre Prisma y DynamoDB mediante la variable de entorno `DB_PROVIDER`.
+1.  **`CourseBuilderApi` (API Gateway):**
+    - Punto de entrada único REST HTTPS.
+    - Enruta las peticiones a las funciones Lambda correspondientes.
 
----
+2.  **`AiScriptsFunction` (Lambda - Node.js 20.x):**
+    - **Rol:** Controlador API síncrono.
+    - **Responsabilidad:** CRUD de Scripts, subida de archivos, y trigger de generación.
+    - **Flujo de Generación:** Recibe la petición, guarda el estado `PENDING` en DynamoDB, e invoca asíncronamente (`Event`) al Worker. Retorna `202 Accepted` al cliente inmediatamente.
 
-## 2. Explicación Técnica: ¿Cómo funciona?
+3.  **`AiScriptsWorkerFunction` (Lambda - Node.js 20.x):**
+    - **Rol:** Worker asíncrono (Background Job).
+    - **Responsabilidad:** Procesamiento pesado de IA. Interactúa con **AWS Bedrock** (Claude 3.5 Sonnet) para generar el contenido educativo.
+    - **Flujo:** Actualiza estado a `PROCESSING` -> Llama a Bedrock -> Guarda resultado en DynamoDB -> Actualiza estado a `COMPLETED`.
 
-### Patrón de Repositorio y Feature Flag
-Para facilitar la migración sin detener el servicio, se implementó un patrón de repositorio:
-*   **Interfaz:** `AiScriptRepository` define los métodos (`create`, `findById`, `findAll`, etc.).
-*   **Implementaciones:**
-    *   `PrismaAiScriptRepository`: Usa el cliente de Prisma (Postgres).
-    *   `DynamoAiScriptRepository`: Usa `DynamoDBDocumentClient` (DynamoDB).
-*   **Factory:** Una función `getRepository()` lee `process.env.DB_PROVIDER` (valores: `prisma` o `dynamodb`) y devuelve la instancia correspondiente.
+4.  **`TemplatesFunction` (Lambda - Node.js 20.x):**
+    - **Responsabilidad:** Proxy/Cache para listar y obtener detalles de templates de **Synthesia**.
 
-### Flujo de "Generar Script" (Asíncrono)
+5.  **`VideosFunction` (Lambda - Node.js 20.x):**
+    - **Responsabilidad:** Gestión de la creación de videos con la API de Synthesia y consulta de estado.
 
-1.  **Inicio (Frontend):** Envía `POST /generate-from-files` con archivos y metadatos.
-2.  **Recepción (API):** `AiScriptsFunction` guarda el registro en DB (`PENDING`) e invoca a `AiScriptsWorkerFunction`. Retorna `202`.
-3.  **Polling (Frontend):** La UI muestra "Generando..." y consulta `GET /ai-scripts/{id}` cada 3 segundos.
-4.  **Procesamiento (Worker):** 
-    *   Recibe el evento con `scriptId`.
-    *   Actualiza DB a `PROCESSING`.
-    *   Genera el contenido con IA.
-    *   Actualiza DB a `COMPLETED` con los datos.
-5.  **Finalización (Frontend):** Al recibir status `COMPLETED`, detiene el polling y redirige al editor.
-
-### Nota sobre Entorno Local (SAM CLI)
-En `sam local`, la invocación asíncrona de AWS SDK (`InvocationType: "Event"`) **no funciona** nativamente contra el mismo contenedor local.
-*   **Solución:** Se ha implementado un bypass en `ai-scripts.ts`. Si detecta `AWS_SAM_LOCAL=true`, invoca al código del worker **directamente (síncrono)**. 
-*   **Efecto:** El Frontend sigue haciendo polling, pero la API local no responderá el `202` hasta que el worker "síncrono" termine (o responderá rápido si se ajusta). Funcionalmente permite probar todo el flujo.
+#### C. Capa de Datos (DynamoDB)
+- **Base de Datos:** Amazon DynamoDB (Single Table Design).
+- **Tabla:** `CourseBuilderTable`.
+- **Patrones de Acceso:**
+    - `PK` (Partition Key) y `SK` (Sort Key) para modelar entidades (`SCRIPT#<id>`, `VIDEO#<id>`).
+    - **GSI1:** Índice secundario para consultas por tipo y fecha (`Type`, `CreatedAt`).
 
 ---
 
-## 3. Guía de Despliegue en AWS
+## 🚀 2. Guía de Despliegue (Paso a Paso)
 
-### A. Preparación (Git)
+**Stack:** 4 Lambdas (SAM) · DynamoDB · API Gateway · S3 + CloudFront
+**Región objetivo:** `us-east-2`
 
-Subir todo excepto `node_modules`, `.aws-sam`, `dist`, y `.env`.
-Asegurarse de que `apps/apiv2/env.json` NO contenga credenciales de producción reales si es público.
+### ✅ Pre-requisitos
 
-### B. Despliegue del Backend (SAM)
+Antes de empezar, verificar instalación:
 
-1.  **Build Manual:**
-    Debido a dependencias nativas (Prisma con binarios RHEL para Lambda), usamos un build manual con `esbuild`:
+```bash
+aws --version          # AWS CLI v2
+sam --version          # SAM CLI >= 1.100
+node --version         # Node 20.x
+```
+
+Configurar credenciales:
+
+```bash
+export AWS_PROFILE=course-builder-bedrock  # O tu perfil configurado
+export AWS_DEFAULT_REGION=us-east-2
+```
+
+### PASO 1 — Verificar permisos IAM
+
+El usuario AWS necesita permisos de Administrador o específicos para: CloudFormation, S3, Lambda, DynamoDB, API Gateway, CloudFront, IAM y **Bedrock**.
+
+```bash
+aws sts get-caller-identity
+```
+
+### PASO 2 — Crear Bucket para Artefactos SAM
+
+SAM necesita un bucket para subir el código de las Lambdas (ZIPs).
+
+```bash
+export SAM_ARTIFACTS_BUCKET=course-builder-sam-artifacts-$(aws sts get-caller-identity --query Account --output text)
+aws s3 mb s3://$SAM_ARTIFACTS_BUCKET --region us-east-2
+```
+
+### PASO 3 — Build del Backend
+
+```bash
+cd apps/apiv2
+
+# 1. Limpiar previos
+rm -rf dist .aws-sam
+
+# 2. Instalar dependencias y compilar
+npm ci
+npm run build
+# (Esto ejecuta esbuild y copia el worker de PDF.js a dist/)
+
+# 3. Empaquetar con SAM
+sam build
+```
+
+### PASO 4 — Deploy del Backend
+
+```bash
+sam deploy \
+  --stack-name course-builder-backend \
+  --s3-bucket $SAM_ARTIFACTS_BUCKET \
+  --region us-east-2 \
+  --capabilities CAPABILITY_IAM \
+  --parameter-overrides \
+    BedrockModelId="us.anthropic.claude-3-5-sonnet-20241022-v2:0" \
+    SynthesiaApiKey="TU_API_KEY_DE_SYNTHESIA" \
+    DynamoEndpoint="" \
+  --resolve-s3 \
+  --no-confirm-changeset
+```
+
+> **Nota:** Para el primer deploy, puedes usar `sam deploy --guided` para configurar interactivamente y guardar el `samconfig.toml`.
+
+**Guarda la `ApiUrl` de los Outputs de CloudFormation.** (Ej: `https://xyz.execute-api.us-east-2.amazonaws.com/prod/`)
+
+### PASO 5 — Backend Smoke Test
+
+```bash
+export API_URL="https://xyz.execute-api.us-east-2.amazonaws.com/prod"
+curl -s "$API_URL/videos/templates" | jq .
+```
+
+### PASO 6 — Build del Frontend
+
+```bash
+cd ../web
+
+# 1. Configurar URL de producción
+export VITE_APP_BASE_URL="https://xyz.execute-api.us-east-2.amazonaws.com/prod"
+
+# 2. Build
+npm ci
+VITE_APP_BASE_URL=$VITE_APP_BASE_URL npm run build
+```
+
+### PASO 7 — Deploy del Frontend (S3 + CloudFront)
+
+1.  **Crear Bucket S3 (Privado):**
+    ```bash
+    export FRONTEND_BUCKET=course-builder-frontend-$(aws sts get-caller-identity --query Account --output text)
+    aws s3 mb s3://$FRONTEND_BUCKET --region us-east-2
+    aws s3api put-public-access-block --bucket $FRONTEND_BUCKET --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+    ```
+
+2.  **Subir Archivos:**
+    ```bash
+    aws s3 sync dist/ s3://$FRONTEND_BUCKET/ --delete
+    ```
+
+3.  **Crear Distribución CloudFront (OAC):**
+    *   Origen: El bucket S3 creado.
+    *   Acceso: Origin Access Control (OAC).
+    *   Viewer Protocol: Redirect HTTP to HTTPS.
+    *   Default Root Object: `index.html`.
+    *   **Importante (SPA Routing):** Configurar Error Pages 403 y 404 para responder con `/index.html` (Status 200).
+
+4.  **Actualizar Bucket Policy:** Copiar la política que CloudFront sugiere para permitir acceso solo desde esa distribución.
+
+### PASO 8 — Verificación Final
+
+Acceder a la URL de CloudFront (`https://d1234.cloudfront.net`) y verificar:
+1.  La app carga correctamente.
+2.  Se listan los templates (llamada API exitosa).
+3.  Se puede crear un script y generarlo (Worker + Bedrock + DynamoDB).
+
+---
+
+## 🛠️ Desarrollo Local
+
+Para correr todo localmente simulando la nube:
+
+1.  **Backend (SAM Local):**
     ```bash
     cd apps/apiv2
-    # Limpia
-    rm -rf .aws-sam dist
-    # Genera cliente prisma (asegurar binaryTargets en schema.prisma incluye "rhel-openssl-3.0.x")
-    npx prisma generate
-    # Compila TS -> JS
-    npm run build
-    # Empaqueta para SAM
-    sam build
+    npm run dev
+    # Corre `sam local start-api` en puerto 3001
+    # Usa DynamoDB local en Docker si DynamoEndpoint está configurado
     ```
 
-2.  **Deploy:**
+2.  **Frontend:**
     ```bash
-    sam deploy --guided
+    cd apps/web
+    npm run dev
+    # Corre Vite en puerto 5173
     ```
-    *   **Stack Name:** `course-builder-backend`
-    *   **Region:** `us-east-1`
-    *   Parámetros (DB URL, API Keys): Se pueden pasar aquí o configurar en AWS Systems Manager / Secrets Manager después.
-
-### C. Despliegue del Frontend
-
-1.  **Build:** `cd apps/web && npm run build` -> genera `dist/`.
-2.  **S3 + CloudFront:**
-    *   Subir `dist/` a un Bucket S3 privado.
-    *   Crear distribución CloudFront con OAI (Origin Access Identity) para leer del bucket.
-    *   Configurar `VITE_APP_BASE_URL` apuntando a la URL del API Gateway (producida en el paso B).
-
----
-
-## 4. Próximos Pasos
-
-1.  **Bedrock Switch:** Cambiar el import en `ai-scripts.ts` para usar `lib/bedrock.ts` y asegurar permisos IAM.
-2.  **Dead Letter Queue (DLQ):** Configurar una cola SQS para eventos fallidos del Worker (reintentos).
-3.  **WebSockets (Opcional):** Para notificar al frontend en tiempo real en lugar de polling.
-
----
-
-## 5. Comparativa: Implementación vs Estrategia Planeada
-
-| Aspecto | Estrategia (`DYNAMODB_MIGRATION_STRATEGY.md`) | Implementación Real | Estado |
-| :--- | :--- | :--- | :--- |
-| **Diseño de Tabla** | Single Table con PK/SK y GSI1 (Type/CreatedAt) | **Idéntico.** Se implementó tal cual en `template.yaml`. | ✅ Completo |
-| **Abstracción** | Recomendar eliminar Prisma y usar SDK directo | **Mejorado.** Se usó **Repository Pattern** para mantener ambas implementaciones vivas y cambiar con flag. | ✅ Superado |
-| **Relaciones** | Fetch único para Script + Videos | **Adaptado.** `findAll` hace join en memoria. `findById` filtra resultados. | ✅ Completo |
-| **Infraestructura** | Agregar Resource en SAM | Agregado `CourseBuilderTable` y `DynamoDBCrudPolicy`. | ✅ Completo |
-| **Local Dev** | Usar DynamoDB Local | Integrado en `docker-compose` y script `init-db.ts`. | ✅ Completo |
-

@@ -9,29 +9,19 @@ Globals:
     MemorySize: 512
     Environment:
       Variables:
-        DATABASE_URL: !Ref DatabaseUrl
-        GROQ_API_KEY: !Ref GroqApiKey
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
         SYNTHESIA_API_KEY: !Ref SynthesiaApiKey
-        DB_PROVIDER: !Ref DbProvider
         DYNAMO_ENDPOINT: !Ref DynamoEndpoint
 
 Parameters:
-  DatabaseUrl:
+  BedrockModelId:
     Type: String
-    Description: PostgreSQL connection string
-    NoEcho: true
-  GroqApiKey:
-    Type: String
-    Description: Groq API key for LLM calls
-    NoEcho: true
+    Description: AWS Bedrock Model ID (e.g. us.anthropic.claude-opus-4-5-20251101-v1:0)
+    Default: "us.anthropic.claude-opus-4-5-20251101-v1:0"
   SynthesiaApiKey:
     Type: String
     Description: Synthesia API key for video generation
     NoEcho: true
-  DbProvider:
-    Type: String
-    Description: Database provider (prisma or dynamodb)
-    Default: prisma
   DynamoEndpoint:
     Type: String
     Description: DynamoDB Endpoint URL (for local testing)
@@ -88,12 +78,13 @@ Resources:
       Handler: dist/ai-scripts.handler
       CodeUri: .
       Description: AI Scripts CRUD and async trigger
-      Timeout: 29
+      Timeout: 900
       MemorySize: 1024
       Environment:
         Variables:
           WORKER_FUNCTION_NAME: !Ref AiScriptsWorkerFunction
           TABLE_NAME: !Ref CourseBuilderTable
+          DYNAMO_ENDPOINT: !Ref DynamoEndpoint
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref AiScriptsWorkerFunction
@@ -142,6 +133,7 @@ Resources:
             RestApiId: !Ref CourseBuilderApi
             Path: /ai-scripts/{id}
             Method: DELETE
+
 
   # ── Lambda 2: AI Scripts Worker ───────────────────────────────────────────
   AiScriptsWorkerFunction:

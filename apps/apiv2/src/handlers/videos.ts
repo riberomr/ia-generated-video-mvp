@@ -14,7 +14,6 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   const videoId = event.pathParameters?.videoId;
 
   console.log("VIDEOS HANDLER INVOKED");
-  console.log("DB_PROVIDER:", process.env.DB_PROVIDER);
   console.log("DYNAMO_ENDPOINT:", process.env.DYNAMO_ENDPOINT);
 
   try {

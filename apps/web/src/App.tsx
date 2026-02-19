@@ -15,7 +15,7 @@ import { SettingsProvider, useSettings } from "./context/SettingsContext";
 function NavBar() {
   const location = useLocation();
   const { t, i18n } = useTranslation();
-  const { aiProvider, setAiProvider } = useSettings();
+  const { aiProvider } = useSettings();
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'es' : 'en';
@@ -59,13 +59,14 @@ function NavBar() {
               <span className="text-xs font-medium text-gray-500 hidden sm:inline">AI Model:</span>
               <select
                 value={aiProvider}
-                onChange={(e) => setAiProvider(e.target.value as 'groq' | 'bedrock')}
-                className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-1 pl-2 pr-8 bg-gray-50"
+                disabled
+                className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-1 pl-2 pr-8 bg-gray-100 cursor-not-allowed"
               >
-                <option value="groq">Groq (Llama 3)</option>
                 <option value="bedrock">Bedrock (Claude 3.5)</option>
               </select>
             </div>
+
+
 
             <button
               onClick={toggleLanguage}

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild src/handlers/*.ts --bundle --platform=node --target=node20 --outdir=dist --external:@prisma/client --external:prisma --external:canvas --external:jsdom --external:xmldom",
+    "build": "esbuild src/handlers/*.ts --bundle --platform=node --target=node20 --outdir=dist --external:canvas --external:jsdom --external:xmldom && cp node_modules/pdfjs-dist/legacy/build/pdf.worker.js dist/",
     "dev": "sam local start-api --warm-containers EAGER --port 3001"
   },
   "dependencies": {
@@ -11,10 +11,8 @@
     "@aws-sdk/client-dynamodb": "^3.992.0",
     "@aws-sdk/client-lambda": "^3.992.0",
     "@aws-sdk/lib-dynamodb": "^3.992.0",
-    "@prisma/client": "^6.0.0",
     "busboy": "^1.6.0",
     "mammoth": "^1.8.0",
-    "openai": "^4.0.0",
     "pdfjs-dist": "^3.11.174",
     "uuid": "^13.0.0"
   },
