@@ -47,7 +47,8 @@ export const mapTechnicalSheetToTemplateSystemPromptWithGoals = (
          **IMPORTANTE**: Tienes exactamente ${sceneCount} escenas disponibles. Debes adaptar y distribuir el contenido para que encaje perfectamente en esas ${sceneCount} escenas.
 
         1. **Presentacion del Docente y Curso**:
-           - "Bienvenidos y bienvenidas, soy ${teacherName}, ${teacherRole}..."
+           - "Bienvenidos y bienvenidas, soy un avatar virtual que los guiará en este video..."
+           - Mencionar que el docente a cargo es ${teacherName}, ${teacherRole}. NO hablar como si fueras el docente en primera persona.
            - Breve descripcion del curso.
 
         2. **Itinerario Formativo**:

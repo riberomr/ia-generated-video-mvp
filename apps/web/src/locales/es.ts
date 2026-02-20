@@ -155,6 +155,7 @@ export const es = {
     "toast.script_deleted": "¡Script eliminado exitosamente!",
     "toast.video_deleted": "¡Video eliminado exitosamente!",
     "toast.generation_started": "¡Generación de video iniciada exitosamente!",
+    "toast.script_generation_started": "¡Generación de script iniciada exitosamente!",
     "toast.status_updated": "¡Estado actualizado!",
     "toast.failed_load_scripts": "Error al cargar los scripts.",
     "toast.failed_load_script": "Error al cargar el script",

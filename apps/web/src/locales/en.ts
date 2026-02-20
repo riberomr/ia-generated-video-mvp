@@ -150,6 +150,7 @@ export const en = {
     "toast.script_deleted": "Script deleted successfully!",
     "toast.video_deleted": "Video deleted successfully!",
     "toast.generation_started": "Video generation started successfully!",
+    "toast.script_generation_started": "Script generation started successfully!",
     "toast.status_updated": "Status updated!",
     "toast.failed_load_scripts": "Failed to load scripts.",
     "toast.failed_load_script": "Error loading script",
